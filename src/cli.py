@@ -1,7 +1,7 @@
 import argparse
 
-from .pipeline.filter import score_and_filter
-from .pipeline.ingest import ingest
+from pipeline.filter import score_and_filter
+from pipeline.ingest import ingest
 
 
 def main() -> int:
@@ -10,7 +10,7 @@ def main() -> int:
     args = parser.parse_args()
 
     tenders = ingest()
-    picked = score_and_filter(tenders)
+    picked, _ = score_and_filter(tenders)
 
     print(f"Ingested: {len(tenders)} | Selected: {len(picked)}")
     if args.dry_run:

@@ -1,0 +1,124 @@
+2026-01-25 10:26:06,348 | INFO | Logging to C:\dev\sap-tender-bot\logs\run_20260125.log
+2026-01-25 10:26:06,349 | INFO | State last_run_iso=2026-01-25T14:25:22.419029+00:00 seen=912
+2026-01-25 10:26:06,349 | INFO | Fetching CanadaBuys tenders since=2026-01-25T14:25:22.419029+00:00
+2026-01-25 10:26:07,767 | INFO | New=0 Flagged=0
+2026-01-25 10:26:07,776 | INFO | Exported CSV to C:\dev\sap-tender-bot\data\exports\flagged_20260125.csv
+2026-01-25 10:26:07,777 | INFO | Dry-run: wrote HTML to C:\dev\sap-tender-bot\data\exports\digest_20260125_102607.html
+2026-01-25 10:26:07,777 | INFO | Dry-run: state not updated.
+2026-01-25 10:27:58,495 | INFO | Logging to C:\dev\sap-tender-bot\logs\run_20260125.log
+2026-01-25 10:27:58,496 | INFO | State last_run_iso=None seen=0
+2026-01-25 10:27:58,496 | INFO | Fetching CanadaBuys tenders since=None
+2026-01-25 10:28:05,494 | INFO | Reject: exclude_supply_arrangement=186
+2026-01-25 10:28:05,494 | INFO | Reject: exclude_goods_or_hardware=183
+2026-01-25 10:28:05,494 | INFO | Reject: exclude_no_erp_domain=127
+2026-01-25 10:28:05,494 | INFO | Reject: exclude_non_it_unspsc=97
+2026-01-25 10:28:05,494 | INFO | Reject: exclude_staffing=2
+2026-01-25 10:28:05,494 | INFO | New=912 Flagged=317
+2026-01-25 10:28:05,498 | INFO | Exported CSV to C:\dev\sap-tender-bot\data\exports\flagged_20260125.csv
+2026-01-25 10:28:05,507 | INFO | Dry-run: wrote HTML to C:\dev\sap-tender-bot\data\exports\digest_20260125_102805.html
+2026-01-25 10:28:05,508 | INFO | Dry-run: state not updated.
+2026-01-25 10:37:26,464 | INFO | Logging to C:\dev\sap-tender-bot\logs\run_20260125.log
+2026-01-25 10:37:26,464 | INFO | State last_run_iso=None seen=0
+2026-01-25 10:37:26,465 | INFO | Fetching CanadaBuys tenders since=None
+2026-01-25 10:37:34,001 | INFO | Reject: exclude_supply_arrangement=365
+2026-01-25 10:37:34,001 | INFO | Reject: exclude_goods_or_hardware=186
+2026-01-25 10:37:34,001 | INFO | Reject: exclude_negative_title=85
+2026-01-25 10:37:34,001 | INFO | Reject: exclude_no_erp_domain=82
+2026-01-25 10:37:34,001 | INFO | Reject: exclude_non_it_unspsc=53
+2026-01-25 10:37:34,001 | INFO | Reject: exclude_staffing=2
+2026-01-25 10:37:34,001 | INFO | New=912 Flagged=139
+2026-01-25 10:37:34,004 | INFO | Exported CSV to C:\dev\sap-tender-bot\data\exports\flagged_20260125.csv
+2026-01-25 10:37:34,005 | INFO | Dry-run: wrote HTML to C:\dev\sap-tender-bot\data\exports\digest_20260125_103734.html
+2026-01-25 10:37:34,005 | INFO | Dry-run: state not updated.
+2026-01-25 10:41:41,536 | INFO | Logging to C:\dev\sap-tender-bot\logs\run_20260125.log
+2026-01-25 10:41:41,537 | INFO | State last_run_iso=None seen=0
+2026-01-25 10:41:41,537 | INFO | Fetching CanadaBuys tenders since=None
+2026-01-25 10:41:50,230 | INFO | Reject: exclude_supply_arrangement=365
+2026-01-25 10:41:50,231 | INFO | Reject: exclude_goods_or_hardware=212
+2026-01-25 10:41:50,231 | INFO | Reject: exclude_negative_title=116
+2026-01-25 10:41:50,231 | INFO | Reject: exclude_no_erp_domain=102
+2026-01-25 10:41:50,231 | INFO | Reject: exclude_non_it_unspsc=79
+2026-01-25 10:41:50,232 | INFO | Reject: exclude_staffing=2
+2026-01-25 10:41:50,233 | INFO | New=912 Flagged=36
+2026-01-25 10:41:50,237 | INFO | Exported CSV to C:\dev\sap-tender-bot\data\exports\flagged_20260125.csv
+2026-01-25 10:41:50,240 | INFO | Dry-run: wrote HTML to C:\dev\sap-tender-bot\data\exports\digest_20260125_104150.html
+2026-01-25 10:41:50,240 | INFO | Dry-run: state not updated.
+2026-01-25 10:43:25,626 | INFO | Logging to C:\dev\sap-tender-bot\logs\run_20260125.log
+2026-01-25 10:43:25,627 | INFO | State last_run_iso=None seen=0
+2026-01-25 10:43:25,627 | INFO | Fetching CanadaBuys tenders since=None
+2026-01-25 10:43:45,226 | INFO | Logging to C:\dev\sap-tender-bot\logs\run_20260125.log
+2026-01-25 10:43:45,227 | INFO | State last_run_iso=None seen=0
+2026-01-25 10:43:45,227 | INFO | Fetching CanadaBuys tenders since=None
+2026-01-25 10:43:48,051 | INFO | Reject: exclude_supply_arrangement=365
+2026-01-25 10:43:48,051 | INFO | Reject: exclude_goods_or_hardware=231
+2026-01-25 10:43:48,051 | INFO | Reject: exclude_negative_title=124
+2026-01-25 10:43:48,051 | INFO | Reject: exclude_no_erp_domain=107
+2026-01-25 10:43:48,051 | INFO | Reject: exclude_non_it_unspsc=82
+2026-01-25 10:43:48,051 | INFO | Reject: exclude_staffing=2
+2026-01-25 10:43:48,051 | INFO | New=912 Flagged=1
+2026-01-25 10:43:48,054 | INFO | Exported CSV to C:\dev\sap-tender-bot\data\exports\flagged_20260125.csv
+2026-01-25 10:43:48,055 | INFO | Dry-run: wrote HTML to C:\dev\sap-tender-bot\data\exports\digest_20260125_104348.html
+2026-01-25 10:43:48,055 | INFO | Dry-run: state not updated.
+2026-01-25 10:44:08,468 | INFO | Reject: exclude_supply_arrangement=365
+2026-01-25 10:44:08,469 | INFO | Reject: exclude_goods_or_hardware=231
+2026-01-25 10:44:08,469 | INFO | Reject: exclude_negative_title=124
+2026-01-25 10:44:08,469 | INFO | Reject: exclude_no_erp_domain=107
+2026-01-25 10:44:08,469 | INFO | Reject: exclude_non_it_unspsc=82
+2026-01-25 10:44:08,469 | INFO | Reject: exclude_staffing=2
+2026-01-25 10:44:08,469 | INFO | New=912 Flagged=1
+2026-01-25 10:44:08,470 | INFO | Exported CSV to C:\dev\sap-tender-bot\data\exports\flagged_20260125.csv
+2026-01-25 10:44:08,471 | INFO | Dry-run: wrote HTML to C:\dev\sap-tender-bot\data\exports\digest_20260125_104408.html
+2026-01-25 10:44:08,471 | INFO | Dry-run: state not updated.
+2026-01-25 10:45:05,455 | INFO | Logging to C:\dev\sap-tender-bot\logs\run_20260125.log
+2026-01-25 10:45:05,456 | INFO | State last_run_iso=None seen=0
+2026-01-25 10:45:05,456 | INFO | Fetching CanadaBuys tenders since=None
+2026-01-25 10:45:30,414 | INFO | Reject: exclude_supply_arrangement=365
+2026-01-25 10:45:30,419 | INFO | Reject: exclude_goods_or_hardware=231
+2026-01-25 10:45:30,420 | INFO | Reject: exclude_negative_title=124
+2026-01-25 10:45:30,420 | INFO | Reject: exclude_no_erp_domain=108
+2026-01-25 10:45:30,420 | INFO | Reject: exclude_non_it_unspsc=82
+2026-01-25 10:45:30,420 | INFO | Reject: exclude_staffing=2
+2026-01-25 10:45:30,420 | INFO | New=912 Flagged=0
+2026-01-25 10:45:30,437 | INFO | Exported CSV to C:\dev\sap-tender-bot\data\exports\flagged_20260125.csv
+2026-01-25 10:45:30,439 | INFO | Dry-run: wrote HTML to C:\dev\sap-tender-bot\data\exports\digest_20260125_104530.html
+2026-01-25 10:45:30,439 | INFO | Dry-run: state not updated.
+2026-01-25 10:52:41,526 | INFO | Logging to C:\dev\sap-tender-bot\logs\run_20260125.log
+2026-01-25 10:52:41,526 | INFO | State last_run_iso=None seen=0
+2026-01-25 10:52:41,526 | INFO | Fetching CanadaBuys tenders since=None
+2026-01-25 10:53:02,985 | INFO | Reject: exclude_supply_arrangement=365
+2026-01-25 10:53:02,986 | INFO | Reject: exclude_goods_or_hardware=232
+2026-01-25 10:53:02,986 | INFO | Reject: exclude_negative_title=122
+2026-01-25 10:53:02,986 | INFO | Reject: exclude_no_erp_domain=108
+2026-01-25 10:53:02,986 | INFO | Reject: exclude_non_it_unspsc=82
+2026-01-25 10:53:02,986 | INFO | Reject: exclude_staffing=2
+2026-01-25 10:53:02,986 | INFO | Reject: exclude_below_score_threshold=1
+2026-01-25 10:53:02,986 | INFO | New=912 Flagged=0
+2026-01-25 10:53:02,991 | INFO | Exported CSV to C:\dev\sap-tender-bot\data\exports\flagged_20260125.csv
+2026-01-25 10:53:02,993 | INFO | Dry-run: wrote HTML to C:\dev\sap-tender-bot\data\exports\digest_20260125_105302.html
+2026-01-25 10:53:02,994 | INFO | Dry-run: state not updated.
+2026-01-25 10:56:28,915 | INFO | Logging to C:\dev\sap-tender-bot\logs\run_20260125.log
+2026-01-25 10:56:28,916 | INFO | State last_run_iso=None seen=0
+2026-01-25 10:56:28,917 | INFO | Fetching CanadaBuys tenders since=None
+2026-01-25 10:56:48,710 | INFO | Reject: exclude_supply_arrangement=365
+2026-01-25 10:56:48,710 | INFO | Reject: exclude_goods_or_hardware=231
+2026-01-25 10:56:48,710 | INFO | Reject: exclude_negative_title=124
+2026-01-25 10:56:48,710 | INFO | Reject: exclude_no_erp_domain=108
+2026-01-25 10:56:48,710 | INFO | Reject: exclude_non_it_unspsc=82
+2026-01-25 10:56:48,710 | INFO | Reject: exclude_staffing=2
+2026-01-25 10:56:48,710 | INFO | New=912 Flagged=0
+2026-01-25 10:56:48,712 | INFO | Exported CSV to C:\dev\sap-tender-bot\data\exports\flagged_20260125.csv
+2026-01-25 10:56:48,713 | INFO | Dry-run: wrote HTML to C:\dev\sap-tender-bot\data\exports\digest_20260125_105648.html
+2026-01-25 10:56:48,713 | INFO | Dry-run: state not updated.
+2026-01-25 10:59:27,662 | INFO | Logging to C:\dev\sap-tender-bot\logs\run_20260125.log
+2026-01-25 10:59:27,663 | INFO | State last_run_iso=None seen=0
+2026-01-25 10:59:27,664 | INFO | Fetching CanadaBuys tenders since=None
+2026-01-25 10:59:54,447 | INFO | Reject: exclude_supply_arrangement=365
+2026-01-25 10:59:54,453 | INFO | Reject: exclude_goods_or_hardware=231
+2026-01-25 10:59:54,453 | INFO | Reject: exclude_negative_title=124
+2026-01-25 10:59:54,454 | INFO | Reject: exclude_no_erp_domain=108
+2026-01-25 10:59:54,454 | INFO | Reject: exclude_non_it_unspsc=82
+2026-01-25 10:59:54,455 | INFO | Reject: exclude_staffing=2
+2026-01-25 10:59:54,455 | INFO | New=912 Flagged=0
+2026-01-25 10:59:54,465 | INFO | Exported CSV to C:\dev\sap-tender-bot\data\exports\flagged_20260125.csv
+2026-01-25 10:59:54,466 | INFO | Dry-run: wrote HTML to C:\dev\sap-tender-bot\data\exports\digest_20260125_105954.html
+2026-01-25 10:59:54,467 | INFO | Dry-run: state not updated.

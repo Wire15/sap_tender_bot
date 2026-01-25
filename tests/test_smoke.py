@@ -9,7 +9,7 @@ from pipeline.ingest import ingest
 
 def test_smoke():
     tenders = ingest()
-    picked = score_and_filter(tenders)
+    picked, _ = score_and_filter(tenders)
     assert len(tenders) >= 1
     assert any("ERP" in t["title"] for t in tenders)
     assert len(picked) >= 1

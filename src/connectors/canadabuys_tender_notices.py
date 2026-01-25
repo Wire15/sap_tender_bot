@@ -11,10 +11,11 @@ from typing import Dict, Iterable, List, Optional
 import requests
 from dateutil import parser as dtparser
 
-from .open_canada_ckan import CKANClient
+from config import CACHE_DIR
+from connectors.open_canada_ckan import CKANClient
 
 CANADABUYS_TENDER_NOTICES_DATASET_ID = "6abd20d4-7a1c-4b38-baa2-9525d0bb2fd2"
-CACHE_DIR = Path("data/cache/canadabuys")
+CACHE_DIR = CACHE_DIR / "canadabuys"
 
 
 def _norm_key(s: str) -> str:
