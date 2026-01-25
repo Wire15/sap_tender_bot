@@ -1,4 +1,5 @@
-﻿import os
+﻿import html
+import os
 import smtplib
 from datetime import datetime
 from email import encoders
@@ -20,17 +21,23 @@ def _llm_bullets(t):
     return bullets
 
 
-def render_digest_html(flagged_top, all_flagged, csv_path=None):
+def _esc(value) -> str:
+    if value is None:
+        return ""
+    return html.escape(str(value), quote=True)
+
+
+def render_digest_html(flagged_top, all_flagged, csv_path=None, watchlist=None):
     rows = []
     for t in flagged_top:
         score = t.get("score", 0)
-        title = t.get("title", "Untitled")
-        org = t.get("org", "Unknown org")
-        close_date = t.get("close_date", "n/a")
-        url = t.get("url", "")
-        source = t.get("source", "source")
+        title = _esc(t.get("title", "Untitled"))
+        org = _esc(t.get("org", "Unknown org"))
+        close_date = _esc(t.get("close_date", "n/a"))
+        url = _esc(t.get("url", ""))
+        source = _esc(t.get("source", "source"))
         bullets = _llm_bullets(t)
-        bullet_html = "".join(f"<li>{b}</li>" for b in bullets) if bullets else ""
+        bullet_html = "".join(f"<li>{_esc(b)}</li>" for b in bullets) if bullets else ""
         bullets_block = f"<ul>{bullet_html}</ul>" if bullet_html else ""
 
         rows.append(
@@ -55,8 +62,58 @@ def render_digest_html(flagged_top, all_flagged, csv_path=None):
             )
         )
 
+    watchlist = watchlist or []
+    watch_rows = []
+    for t in watchlist:
+        title = _esc(t.get("title", "Untitled"))
+        org = _esc(t.get("org", "Unknown org"))
+        close_date = _esc(t.get("close_date", "n/a"))
+        url = _esc(t.get("url", ""))
+        reason = _esc(t.get("_reject_reason", ""))
+        source = _esc(t.get("source", "source"))
+        watch_rows.append(
+            """
+        <tr>
+          <td>
+            <a href="{url}">{title}</a><br>
+            <small>{org} | {source}</small>
+          </td>
+          <td>{close_date}</td>
+          <td>{reason}</td>
+        </tr>
+        """.format(
+                title=title,
+                url=url,
+                org=org,
+                source=source,
+                close_date=close_date,
+                reason=reason,
+            )
+        )
+
+    watch_section = ""
+    if watch_rows:
+        watch_section = """
+        <h3>Watchlist (near-miss)</h3>
+        <p>Items rejected for a single reason.</p>
+        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse;">
+          <thead>
+            <tr>
+              <th>Tender</th>
+              <th>Closes</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows}
+          </tbody>
+        </table>
+        """.format(
+            rows="".join(watch_rows),
+        )
+
     today = datetime.now().strftime("%Y-%m-%d")
-    csv_note = f"<p>CSV exported to: <code>{csv_path}</code></p>" if csv_path else ""
+    csv_note = f"<p>CSV exported to: <code>{_esc(csv_path)}</code></p>" if csv_path else ""
     return """
     <html>
       <body style="font-family: Arial, sans-serif;">
@@ -75,6 +132,7 @@ def render_digest_html(flagged_top, all_flagged, csv_path=None):
             {rows}
           </tbody>
         </table>
+        {watch_section}
       </body>
     </html>
     """.format(
@@ -83,7 +141,9 @@ def render_digest_html(flagged_top, all_flagged, csv_path=None):
         all_count=len(all_flagged),
         rows="".join(rows),
         csv_note=csv_note,
+        watch_section=watch_section,
     )
+
 
 
 def _attach_csv(msg, csv_path: Path):
@@ -94,7 +154,8 @@ def _attach_csv(msg, csv_path: Path):
     msg.attach(part)
 
 
-def send_digest_email(flagged_top, all_flagged=None, csv_path=None):
+
+def send_digest_email(flagged_top, all_flagged=None, csv_path=None, watchlist=None):
     smtp_host = os.environ["SMTP_HOST"]
     smtp_port = int(os.environ.get("SMTP_PORT", "587"))
     smtp_user = os.environ["SMTP_USER"]
@@ -109,7 +170,7 @@ def send_digest_email(flagged_top, all_flagged=None, csv_path=None):
     msg["From"] = email_from
     msg["To"] = email_to
 
-    html = render_digest_html(flagged_top, all_flagged, csv_path=csv_path)
+    html = render_digest_html(flagged_top, all_flagged, csv_path=csv_path, watchlist=watchlist)
     msg.attach(MIMEText(html, "html"))
 
     if csv_path:

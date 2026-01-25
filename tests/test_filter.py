@@ -61,3 +61,27 @@ def test_accent_and_apostrophe_normalization():
     )
     kept, _ = score_and_filter([t])
     assert len(kept) == 1
+
+
+def test_negative_title_blocks_non_sap():
+    t = _tender(
+        uid="t6",
+        title="Roof replacement at building A",
+        description_en="ERP implementation and migration for finance and payroll.",
+        unspsc=["43211500"],
+    )
+    kept, _, rejected = score_and_filter([t], return_rejected=True)
+    assert kept == []
+    assert any(r.get("_reject_reason") == "exclude_negative_title" for r in rejected)
+
+
+def test_supply_arrangement_excluded():
+    t = _tender(
+        uid="t7",
+        title="Arrangement en matière d'approvisionnement - Services d'impression",
+        description_en="ERP modernization project with system integration.",
+        unspsc=["43211500"],
+    )
+    kept, _, rejected = score_and_filter([t], return_rejected=True)
+    assert kept == []
+    assert any(r.get("_reject_reason") == "exclude_supply_arrangement" for r in rejected)

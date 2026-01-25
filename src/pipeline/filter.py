@@ -574,9 +574,23 @@ def is_non_it_unspsc(t: dict) -> bool:
 # ---------------------------
 
 
-def score_and_filter(tenders: List[Dict[str, object]]) -> Tuple[List[Dict[str, object]], Counter]:
+def score_and_filter(
+    tenders: List[Dict[str, object]],
+    return_rejected: bool = False,
+    config: Dict[str, object] | None = None,
+) -> Tuple[List[Dict[str, object]], Counter] | Tuple[List[Dict[str, object]], Counter, List[Dict[str, object]]]:
+    config = config or {}
+    include_supply_arrangements = bool(
+        config.get("include_supply_arrangements", INCLUDE_SUPPLY_ARRANGEMENTS)
+    )
+    include_staffing = bool(config.get("include_staffing", INCLUDE_STAFFING))
+    max_non_sap_close_days = int(config.get("max_non_sap_close_days", MAX_NON_SAP_CLOSE_DAYS))
+    min_score_non_sap = int(config.get("min_score_non_sap", MIN_SCORE_NON_SAP))
+    store_hits = bool(config.get("store_hits", STORE_HITS))
+
     kept: List[Dict[str, object]] = []
     reasons: Counter = Counter()
+    rejected: List[Dict[str, object]] = []
 
     for t in tenders:
         text = _text_blob(t)
@@ -590,11 +604,11 @@ def score_and_filter(tenders: List[Dict[str, object]]) -> Tuple[List[Dict[str, o
         allowlist_product_hits = find_matches(title_norm, ERP_PRODUCT_ALLOWLIST)
         allowlist_title_hits = find_matches(title_norm, ERP_TITLE_ALLOWLIST)
         allowlist_any = bool(allowlist_product_hits or allowlist_title_hits)
+        portal_hits = find_matches(text, SAP_PORTAL_CONTEXT)
 
         sap_direct = bool(sap_hits)
 
         if sap_direct:
-            portal_hits = find_matches(text, SAP_PORTAL_CONTEXT)
             sap_terms = set(sap_hits)
             if sap_terms.issubset({"sap", "ariba"}):
                 if portal_hits and "sap" not in title_norm and "ariba" not in title_norm and not allowlist_any:
@@ -603,53 +617,51 @@ def score_and_filter(tenders: List[Dict[str, object]]) -> Tuple[List[Dict[str, o
                     if "sap" not in title_norm and "ariba" not in title_norm:
                         sap_direct = False
 
-        # Supply arrangements are excluded by default (even if SAP-direct)
-        if not INCLUDE_SUPPLY_ARRANGEMENTS and _looks_like_supply_arrangement(text):
-            reasons["exclude_supply_arrangement"] += 1
-            continue
+        hits_payload = {
+            "sap": sap_hits,
+            "erp": erp_hits,
+            "transform": xform_hits,
+            "it": it_hits,
+            "allowlist_title": allowlist_title_hits,
+            "allowlist_product": allowlist_product_hits,
+            "sap_portal": portal_hits,
+            "unspsc_it": is_it_unspsc(t),
+            "unspsc_non_it": is_non_it_unspsc(t),
+        }
 
-        # Noise exclusions (unless SAP-direct)
+        reasons_all: List[str] = []
+
+        if not include_supply_arrangements and _looks_like_supply_arrangement(text):
+            reasons_all.append("exclude_supply_arrangement")
+
         if not sap_direct:
-
-            if not INCLUDE_STAFFING and _looks_like_staffing(title):
-                reasons["exclude_staffing"] += 1
-                continue
+            if not include_staffing and _looks_like_staffing(title):
+                reasons_all.append("exclude_staffing")
 
             if _looks_like_negative_title(title) and not allowlist_any:
-                reasons["exclude_negative_title"] += 1
-                continue
+                reasons_all.append("exclude_negative_title")
 
             if is_non_it_unspsc(t):
-                reasons["exclude_non_it_unspsc"] += 1
-                continue
+                reasons_all.append("exclude_non_it_unspsc")
 
             if _is_goods_or_hardware(t, text):
-                reasons["exclude_goods_or_hardware"] += 1
-                continue
+                reasons_all.append("exclude_goods_or_hardware")
 
-            # Core gate: ERP domain + transformation intent
             if not erp_hits and not allowlist_any:
-                reasons["exclude_no_erp_domain"] += 1
-                continue
+                reasons_all.append("exclude_no_erp_domain")
             if not xform_hits:
-                reasons["exclude_no_transformation"] += 1
-                continue
+                reasons_all.append("exclude_no_transformation")
 
-            # Need either: IT UNSPSC OR strong IT context
             if not is_it_unspsc(t) and len(it_hits) < 1 and not allowlist_any:
-                reasons["exclude_no_it_context"] += 1
-                continue
+                reasons_all.append("exclude_no_it_context")
 
-            # Long-dated closes are usually frameworks
-            if _close_date_far_future(t, days=MAX_NON_SAP_CLOSE_DAYS):
-                reasons["exclude_far_future_close"] += 1
-                continue
+            if _close_date_far_future(t, days=max_non_sap_close_days):
+                reasons_all.append("exclude_far_future_close")
 
-        # Scoring
+        # Scoring (needed for threshold)
         score = 0
         if sap_direct:
             score = 100
-            # small bonus for multiple SAP keywords (caps at +20)
             score += min(20, 5 * (len(sap_hits) - 1)) if len(sap_hits) > 1 else 0
         else:
             score = 55
@@ -659,26 +671,28 @@ def score_and_filter(tenders: List[Dict[str, object]]) -> Tuple[List[Dict[str, o
             score += min(10, 4 * len(it_hits))
             score = min(score, 95)
 
-            if score < MIN_SCORE_NON_SAP:
-                reasons["exclude_below_score_threshold"] += 1
-                continue
+            if score < min_score_non_sap:
+                reasons_all.append("exclude_below_score_threshold")
+
+        if reasons_all:
+            reasons[reasons_all[0]] += 1
+            if return_rejected:
+                item = dict(t)
+                item["_reject_reason"] = reasons_all[0]
+                item["_reject_reasons"] = reasons_all
+                if store_hits:
+                    item["_hits"] = hits_payload
+                rejected.append(item)
+            continue
 
         t["score"] = int(score)
 
-        if STORE_HITS:
-            t["_hits"] = {
-                "sap": sap_hits,
-                "erp": erp_hits,
-                "transform": xform_hits,
-                "it": it_hits,
-                "allowlist_title": allowlist_title_hits,
-                "allowlist_product": allowlist_product_hits,
-                "sap_portal": find_matches(text, SAP_PORTAL_CONTEXT),
-                "unspsc_it": is_it_unspsc(t),
-                "unspsc_non_it": is_non_it_unspsc(t),
-            }
+        if store_hits:
+            t["_hits"] = hits_payload
 
         kept.append(t)
 
     kept.sort(key=lambda x: x.get("score", 0), reverse=True)
+    if return_rejected:
+        return kept, reasons, rejected
     return kept, reasons

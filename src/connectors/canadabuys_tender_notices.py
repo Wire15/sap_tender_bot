@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
+import json
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -34,6 +36,27 @@ def _pick_field(row: Dict[str, str], candidates: List[str]) -> Optional[str]:
             val = row.get(norm_map[nk], "")
             return val.strip() if isinstance(val, str) else val
     return None
+
+
+def _cache_meta_path(url: str) -> Path:
+    digest = hashlib.sha256(url.encode("utf-8")).hexdigest()
+    return CACHE_DIR / f"meta_{digest}.json"
+
+
+def _load_cache_meta(url: str) -> dict:
+    path = _cache_meta_path(url)
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _save_cache_meta(url: str, meta: dict) -> None:
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    path = _cache_meta_path(url)
+    path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
 
 def _parse_dt(s: Optional[str]) -> Optional[datetime]:
@@ -105,12 +128,46 @@ def _choose_best_resource(resources: list[dict], prefer: str = "open") -> dict:
 def _download(url: str, dest: Path) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     headers = {"User-Agent": "sap-tender-bot/0.1"}
-    with requests.get(url, headers=headers, stream=True, timeout=120) as r:
-        r.raise_for_status()
+    meta = _load_cache_meta(url)
+    if dest.exists():
+        etag = meta.get("etag")
+        last_modified = meta.get("last_modified")
+        if etag:
+            headers["If-None-Match"] = etag
+        if last_modified:
+            headers["If-Modified-Since"] = last_modified
+
+    def _write_response(resp) -> None:
         with open(dest, "wb") as f:
-            for chunk in r.iter_content(chunk_size=1024 * 1024):
+            for chunk in resp.iter_content(chunk_size=1024 * 1024):
                 if chunk:
                     f.write(chunk)
+
+    with requests.get(url, headers=headers, stream=True, timeout=120) as r:
+        if r.status_code == 304:
+            if dest.exists():
+                return dest
+            # Cache metadata is stale; retry without conditional headers.
+            headers.pop("If-None-Match", None)
+            headers.pop("If-Modified-Since", None)
+            with requests.get(url, headers=headers, stream=True, timeout=120) as r2:
+                r2.raise_for_status()
+                _write_response(r2)
+                r = r2
+        else:
+            r.raise_for_status()
+            _write_response(r)
+
+        updated_meta = dict(meta)
+        updated_meta["url"] = url
+        updated_meta["fetched_at"] = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        etag = r.headers.get("ETag")
+        last_modified = r.headers.get("Last-Modified")
+        if etag:
+            updated_meta["etag"] = etag
+        if last_modified:
+            updated_meta["last_modified"] = last_modified
+        _save_cache_meta(url, updated_meta)
     return dest
 
 
