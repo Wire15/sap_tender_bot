@@ -4,10 +4,14 @@ __pycache__/
 .venv/
 .env
 
-# OS/Editor
-.DS_Store
-.vscode/
+# Test/cache
+.pytest_cache/
+.ruff_cache/
 
-# Data
+# Local data
 data/
 *.sqlite
+
+# OS
+.DS_Store
+Thumbs.db
