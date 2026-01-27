@@ -1,7 +1,7 @@
 import argparse
 
-from pipeline.filter import score_and_filter
-from pipeline.ingest import ingest
+from sap_tender_bot.pipeline.filter import score_and_filter
+from sap_tender_bot.pipeline.ingest import ingest
 
 
 def main() -> int:

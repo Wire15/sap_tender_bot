@@ -1,9 +1,4 @@
-﻿import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from pipeline.filter import score_and_filter
+﻿from sap_tender_bot.pipeline.filter import score_and_filter
 
 
 def _tender(**overrides):
@@ -78,10 +73,24 @@ def test_negative_title_blocks_non_sap():
 def test_supply_arrangement_excluded():
     t = _tender(
         uid="t7",
-        title="Arrangement en matière d'approvisionnement - Services d'impression",
+        title="",
+        title_fr="Arrangement en matière d'approvisionnement - Services d'impression",
         description_en="ERP modernization project with system integration.",
         unspsc=["43211500"],
     )
     kept, _, rejected = score_and_filter([t], return_rejected=True)
     assert kept == []
     assert any(r.get("_reject_reason") == "exclude_supply_arrangement" for r in rejected)
+
+
+def test_award_notice_excluded():
+    t = _tender(
+        uid="t8",
+        title="PAC - SAP support",
+        description_en="SAP modernization and system integration.",
+        notice_type_en="Advance Contract Award Notice",
+        unspsc=["43211500"],
+    )
+    kept, _, rejected = score_and_filter([t], return_rejected=True)
+    assert kept == []
+    assert any(r.get("_reject_reason") == "exclude_award_notice" for r in rejected)

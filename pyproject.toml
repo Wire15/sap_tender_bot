@@ -1,3 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sap-tender-bot"
+version = "0.2.0"
+description = "Daily digest bot for SAP/ERP tender notices."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "requests>=2.32.0",
+  "python-dateutil>=2.9.0",
+  "python-dotenv>=1.0.0",
+  "pandas>=2.2.0",
+  "streamlit>=1.30.0",
+  "PyYAML>=6.0.1",
+  "pypdf>=4.2.0",
+  "python-docx>=1.1.2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.4.0",
+  "ruff>=0.4.0",
+]
+
+[project.scripts]
+sap-tender-digest = "sap_tender_bot.daily_digest:main"
+sap-tender-ui = "sap_tender_bot.ui:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["sap_tender_bot", "sap_tender_bot.pipeline", "sap_tender_bot.connectors"]
+
 [tool.ruff]
 line-length = 100
 

@@ -22,7 +22,11 @@ import re  # noqa: E402
 import unicodedata  # noqa: E402
 from collections import Counter  # noqa: E402
 from datetime import datetime, timezone  # noqa: E402
+from pathlib import Path  # noqa: E402
 from typing import Dict, List, Pattern, Tuple  # noqa: E402
+
+from sap_tender_bot.config import EmbeddingsConfig  # noqa: E402
+from sap_tender_bot.pipeline.semantic import semantic_rank_tenders  # noqa: E402
 
 # ---------------------------
 # CONFIG (tune as you like)
@@ -143,6 +147,8 @@ ERP_DOMAIN_TERMS = [
     "pension payroll",
     "asset management system",
     "inventory management system",
+    "supply chain management",
+    "supply chain control tower",
 
     # French (normalized to ASCII)
     "progiciel de gestion integre",
@@ -157,6 +163,8 @@ ERP_DOMAIN_TERMS = [
     "grand livre",
     "comptes crediteurs",
     "comptes debiteurs",
+    "chaine d'approvisionnement",
+    "tour de controle de la chaine d'approvisionnement",
 ]
 
 # Transformation intent (requires implementation/upgrade/migration/replacement...)
@@ -399,6 +407,24 @@ HARDWARE_TERMS = [
 SUPPLY_ARRANGEMENT = compile_terms(SUPPLY_ARRANGEMENT_TERMS)
 HARDWARE = compile_terms(HARDWARE_TERMS)
 
+AWARD_NOTICE_TERMS = [
+    "advance contract award notice",
+    "contract award notice",
+    "contract award",
+    "award notice",
+    "advance contract award",
+    "acan",
+
+    # French (normalized to ASCII)
+    "avis d'attribution de contrat",
+    "avis d'attribution",
+    "avis d'adjudication",
+    "avis d'adjudication de contrat",
+    "avis d'attribution de marche",
+]
+
+AWARD_NOTICE = compile_terms(AWARD_NOTICE_TERMS)
+
 NEGATIVE_TITLE_TERMS = [
     # construction / facilities
     "construction",
@@ -494,6 +520,7 @@ def _text_blob(t: Dict[str, object]) -> str:
     Do NOT include URLs or attachment filenames here.
     """
     parts = [
+        t.get("title", ""),
         t.get("title_en", ""),
         t.get("title_fr", ""),
         t.get("description_en", ""),
@@ -522,6 +549,13 @@ def _looks_like_staffing(title: str) -> bool:
 def _looks_like_negative_title(title: str) -> bool:
     title_norm = normalize_text(title or "")
     return bool(find_matches(title_norm, NEGATIVE_TITLE))
+
+def _looks_like_award_notice(notice_type: str, title: str) -> bool:
+    if notice_type:
+        if find_matches(notice_type, AWARD_NOTICE):
+            return True
+    title_norm = normalize_text(title or "")
+    return bool(re.search(r"^(acan|pac)\b", title_norm))
 
 
 def _is_goods_or_hardware(t: Dict[str, object], text: str) -> bool:
@@ -552,8 +586,8 @@ def is_it_unspsc(t: dict) -> bool:
     if isinstance(codes, str):
         codes = [codes]
 
-    it_prefixes = ("43", "432", "4321", "4322", "4323", "8111", "8112", "8113")
-    return any(str(c).startswith(it_prefixes) for c in codes if c)
+    it_prefixes = ("43", "432", "4321", "4322", "4323", "8111", "8112", "8113", "8114")
+    return any(str(c).startswith(it_prefixes) or str(c) == "80101507" for c in codes if c)
 
 
 def is_non_it_unspsc(t: dict) -> bool:
@@ -578,6 +612,10 @@ def score_and_filter(
     tenders: List[Dict[str, object]],
     return_rejected: bool = False,
     config: Dict[str, object] | None = None,
+    *,
+    semantic_config: EmbeddingsConfig | None = None,
+    cache_dir: Path | None = None,
+    logger=None,
 ) -> Tuple[List[Dict[str, object]], Counter] | Tuple[List[Dict[str, object]], Counter, List[Dict[str, object]]]:
     config = config or {}
     include_supply_arrangements = bool(
@@ -591,10 +629,19 @@ def score_and_filter(
     kept: List[Dict[str, object]] = []
     reasons: Counter = Counter()
     rejected: List[Dict[str, object]] = []
+    candidates: List[Dict[str, object]] = []
 
     for t in tenders:
         text = _text_blob(t)
         title = str(t.get("title", "") or "")
+        notice_type = normalize_text(
+            t.get("notice_type_en", "") or t.get("notice_type_fr", "") or ""
+        )
+        is_rfi = ("request for information" in notice_type) or ("demande de renseignements" in notice_type)
+        is_rfp_against_sa = (
+            "rfp against supply arrangement" in notice_type
+            or "decoulant d'un arrangement en matiere d'approvisionnement" in notice_type
+        )
 
         sap_hits = find_matches(text, SAP_DIRECT)
         erp_hits = find_matches(text, ERP_DOMAIN)
@@ -628,10 +675,24 @@ def score_and_filter(
             "unspsc_it": is_it_unspsc(t),
             "unspsc_non_it": is_non_it_unspsc(t),
         }
+        evidence_payload = {
+            "sap_direct": sap_direct,
+            "sap_hits": sap_hits,
+            "erp_hits": erp_hits,
+            "transform_hits": xform_hits,
+            "it_hits": it_hits,
+            "allowlist_hits": list(allowlist_title_hits + allowlist_product_hits),
+            "allowlist": allowlist_any,
+            "unspsc_it": is_it_unspsc(t),
+            "unspsc_non_it": is_non_it_unspsc(t),
+        }
 
         reasons_all: List[str] = []
 
-        if not include_supply_arrangements and _looks_like_supply_arrangement(text):
+        if _looks_like_award_notice(notice_type, title):
+            reasons_all.append("exclude_award_notice")
+
+        if not include_supply_arrangements and _looks_like_supply_arrangement(text) and not is_rfp_against_sa:
             reasons_all.append("exclude_supply_arrangement")
 
         if not sap_direct:
@@ -647,9 +708,10 @@ def score_and_filter(
             if _is_goods_or_hardware(t, text):
                 reasons_all.append("exclude_goods_or_hardware")
 
-            if not erp_hits and not allowlist_any:
+            allow_it_modernization = bool(xform_hits) and (is_it_unspsc(t) or len(it_hits) > 0)
+            if not erp_hits and not allowlist_any and not allow_it_modernization:
                 reasons_all.append("exclude_no_erp_domain")
-            if not xform_hits:
+            if not xform_hits and not is_rfi and not allowlist_any:
                 reasons_all.append("exclude_no_transformation")
 
             if not is_it_unspsc(t) and len(it_hits) < 1 and not allowlist_any:
@@ -658,7 +720,7 @@ def score_and_filter(
             if _close_date_far_future(t, days=max_non_sap_close_days):
                 reasons_all.append("exclude_far_future_close")
 
-        # Scoring (needed for threshold)
+        # Stage 1: rule-based scoring (baseline + fallback)
         score = 0
         if sap_direct:
             score = 100
@@ -671,9 +733,6 @@ def score_and_filter(
             score += min(10, 4 * len(it_hits))
             score = min(score, 95)
 
-            if score < min_score_non_sap:
-                reasons_all.append("exclude_below_score_threshold")
-
         if reasons_all:
             reasons[reasons_all[0]] += 1
             if return_rejected:
@@ -685,14 +744,109 @@ def score_and_filter(
                 rejected.append(item)
             continue
 
-        t["score"] = int(score)
-
+        t["_rule_score"] = int(score)
+        t["_sap_direct"] = sap_direct
+        t["_evidence"] = evidence_payload
         if store_hits:
             t["_hits"] = hits_payload
+        candidates.append(t)
 
+    # Stage 2: semantic ranking (embeddings + evidence)
+    if candidates:
+        try:
+            semantic_rank_tenders(
+                candidates,
+                config=semantic_config,
+                cache_dir=cache_dir,
+                logger=logger,
+            )
+        except Exception as exc:
+            if logger:
+                logger.warning("Semantic ranking failed; falling back to rules: %s", exc)
+            for t in candidates:
+                t["semantic_score"] = t.get("_rule_score", 0)
+                t["semantic_similarity"] = 0.0
+                t["semantic_bucket"] = "unknown"
+                t["semantic_evidence"] = dict(t.get("_evidence") or {})
+                t["semantic_used_embeddings"] = False
+
+    # Stage 3: threshold + final decision
+    for t in candidates:
+        sap_direct = bool(t.get("_sap_direct"))
+        score = t.get("semantic_score")
+        if score is None:
+            score = t.get("_rule_score", 0)
+        score = max(int(score), int(t.get("_rule_score", 0)))
+        if sap_direct:
+            extra = 0
+            hits = t.get("_hits") or {}
+            sap_list = hits.get("sap") or []
+            if len(sap_list) > 1:
+                extra = min(20, 5 * (len(sap_list) - 1))
+            score = max(100, int(score) + extra)
+
+        t["score"] = int(score)
+
+        if not sap_direct and score < min_score_non_sap:
+            reasons["exclude_below_score_threshold"] += 1
+            if return_rejected:
+                item = dict(t)
+                item["_reject_reason"] = "exclude_below_score_threshold"
+                item["_reject_reasons"] = ["exclude_below_score_threshold"]
+                rejected.append(item)
+            continue
+
+        t["rationale"] = _build_rationale(t)
         kept.append(t)
 
     kept.sort(key=lambda x: x.get("score", 0), reverse=True)
     if return_rejected:
         return kept, reasons, rejected
     return kept, reasons
+
+
+def _short_list(items: list[str], limit: int = 3) -> str:
+    clean = [str(i) for i in items if i]
+    if not clean:
+        return ""
+    if len(clean) <= limit:
+        return ", ".join(clean)
+    return ", ".join(clean[:limit]) + f", +{len(clean) - limit} more"
+
+
+def _build_rationale(t: dict) -> str:
+    hits = t.get("_hits") or {}
+    evidence = t.get("semantic_evidence") or t.get("_evidence") or {}
+    parts: list[str] = []
+    rule_bits: list[str] = []
+
+    sap_hits = evidence.get("sap_hits") or hits.get("sap") or []
+    erp_hits = evidence.get("erp_hits") or hits.get("erp") or []
+    transform_hits = evidence.get("transform_hits") or hits.get("transform") or []
+    allowlist_hits = evidence.get("allowlist_hits") or []
+
+    if evidence.get("sap_direct"):
+        sap_snip = _short_list(list(sap_hits), limit=3)
+        rule_bits.append(f"SAP direct ({sap_snip})" if sap_snip else "SAP direct")
+    else:
+        if erp_hits:
+            rule_bits.append(f"ERP domain ({_short_list(list(erp_hits), limit=3)})")
+        if transform_hits:
+            rule_bits.append(f"Transform ({_short_list(list(transform_hits), limit=3)})")
+    if evidence.get("unspsc_it"):
+        rule_bits.append("UNSPSC IT")
+    if allowlist_hits:
+        rule_bits.append(f"Allowlist ({_short_list(list(allowlist_hits), limit=2)})")
+
+    if rule_bits:
+        parts.append("Rules: " + "; ".join(rule_bits))
+
+    bucket = t.get("semantic_bucket")
+    similarity = t.get("semantic_similarity")
+    if bucket and bucket != "unknown":
+        if isinstance(similarity, (int, float)):
+            parts.append(f"Semantic: {bucket} (sim {similarity:.2f})")
+        else:
+            parts.append(f"Semantic: {bucket}")
+
+    return " | ".join(parts)

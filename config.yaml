@@ -1,0 +1,77 @@
+﻿app:
+  env: dev
+  timezone: America/Toronto
+paths:
+  data_dir: data
+  cache_dir: data/cache
+  log_dir: logs
+  db_path: data/sap_tender.db
+rules:
+  min_score_non_sap: 70
+  max_non_sap_close_days: 365
+  include_staffing: false
+  include_supply_arrangements: false
+  store_hits: true
+digest:
+  seen_retention_days: 180
+  watchlist_max: 15
+  watchlist_blocklist:
+    - exclude_supply_arrangement
+    - exclude_staffing
+    - exclude_negative_title
+    - exclude_non_it_unspsc
+    - exclude_goods_or_hardware
+    - exclude_no_erp_domain
+    - exclude_far_future_close
+notifications:
+  email_recipients: []
+  email_from: ""
+  smtp_host: ""
+  smtp_port: 587
+  smtp_user: ""
+  smtp_pass: ""
+  slack_webhook: ""
+  digest_schedule: "daily 08:35"
+llm:
+  enabled: true
+  api_key: ""
+  model: command-a-03-2025
+  api_base: https://api.cohere.com
+  timeout_s: 45
+  borderline_max: 10
+  daily_cap: 120
+  per_run_max: 40
+  watchlist_min_score: 80
+embeddings:
+  enabled: true
+  api_key: ""
+  model: embed-multilingual-v3.0
+  api_base: https://api.cohere.com
+  timeout_s: 45
+  batch_size: 32
+  input_type: search_document
+attachments:
+  enabled: true
+  max_attachments_per_run: 20
+  max_attachments_per_tender: 3
+  max_bytes: 15000000
+  timeout_s: 40
+  download_retries: 2
+  download_concurrency: 4
+  section_char_budget: 4000
+  max_sections: 4
+  min_text_chars_for_ocr: 800
+  ocr_enabled: false
+  pii_scrub: false
+  llm_enabled: true
+  llm_model: command-r
+  llm_api_key: ""
+  llm_api_base: https://api.cohere.com
+  llm_timeout_s: 45
+  llm_per_run_max: 20
+  llm_daily_cap: 0
+sources:
+  - name: CanadaBuys CKAN
+    enabled: true
+    priority: 1
+    notes: Open tender notices

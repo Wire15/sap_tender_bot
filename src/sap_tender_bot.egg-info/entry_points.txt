@@ -1,0 +1,3 @@
+[console_scripts]
+sap-tender-digest = sap_tender_bot.daily_digest:main
+sap-tender-ui = sap_tender_bot.ui:main

@@ -1,0 +1,21 @@
+2026-01-27 13:13:51,365 | INFO | Logging to C:\dev\sap-tender-bot\logs\run_20260127.log
+2026-01-27 13:13:51,366 | INFO | Applying DB migration 2
+2026-01-27 13:13:51,377 | INFO | No prior run found; consider --bootstrap to seed state.
+2026-01-27 13:13:51,377 | INFO | SQLite store: C:\dev\sap-tender-bot\data\sap_tender.db
+2026-01-27 13:13:51,377 | INFO | Last successful run: None
+2026-01-27 13:13:51,377 | INFO | Fetching CanadaBuys tenders since=None
+2026-01-27 13:14:00,175 | INFO | Reject: exclude_supply_arrangement=286
+2026-01-27 13:14:00,175 | INFO | Reject: exclude_goods_or_hardware=215
+2026-01-27 13:14:00,184 | INFO | Reject: exclude_negative_title=164
+2026-01-27 13:14:00,184 | INFO | Reject: exclude_no_erp_domain=124
+2026-01-27 13:14:00,184 | INFO | Reject: exclude_non_it_unspsc=74
+2026-01-27 13:14:00,184 | INFO | Reject: exclude_award_notice=28
+2026-01-27 13:14:00,185 | INFO | Reject: exclude_no_it_context=1
+2026-01-27 13:14:00,185 | INFO | Reject: exclude_far_future_close=1
+2026-01-27 13:14:00,185 | INFO | Reject: exclude_below_score_threshold=1
+2026-01-27 13:14:00,185 | INFO | Events: new=907 updated=0 candidates=907 flagged=13
+2026-01-27 13:14:00,187 | INFO | Exported CSV to C:\dev\sap-tender-bot\data\exports\flagged_20260127.csv
+2026-01-27 13:14:00,190 | INFO | Exported near-miss CSV to C:\dev\sap-tender-bot\data\exports\near_miss_20260127.csv
+2026-01-27 13:14:00,191 | INFO | Exported reject report to C:\dev\sap-tender-bot\data\exports\reject_report_20260127_131400.json
+2026-01-27 13:14:00,192 | INFO | Dry-run: wrote HTML to C:\dev\sap-tender-bot\data\exports\digest_20260127_131400.html
+2026-01-27 13:14:00,193 | INFO | Dry-run: state not updated.

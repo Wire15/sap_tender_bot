@@ -7,7 +7,6 @@ import pandas as pd
 import streamlit as st
 
 import ui_common as ui
-from config import REPO_ROOT
 
 ui.set_page_config("SAP Tender Admin")
 filters = ui.render_sidebar()
@@ -19,7 +18,7 @@ if filters.get("role") != "Admin":
     st.stop()
 
 config = ui.load_ui_config()
-rules = config.get("rules", {})
+rules = config.rules
 
 st.subheader("Run controls")
 with st.form("run_controls"):
@@ -28,6 +27,7 @@ with st.form("run_controls"):
     with col1:
         dry_run = st.checkbox("Dry run (no email)", value=True)
         include_llm = st.checkbox("Include LLM enrichment", value=False)
+        include_attachments = st.checkbox("Include attachment enrichment", value=True)
     with col2:
         export_csv = st.checkbox("Export CSV", value=True)
         export_near_miss = st.checkbox("Export near-miss", value=True)
@@ -55,28 +55,30 @@ if submitted:
         args.extend(
             [
                 "--min-score-non-sap",
-                str(int(rules.get("min_score_non_sap", 70))),
+                str(int(rules.min_score_non_sap)),
                 "--max-non-sap-close-days",
-                str(int(rules.get("max_non_sap_close_days", 365))),
+                str(int(rules.max_non_sap_close_days)),
             ]
         )
-        if bool(rules.get("include_staffing", False)):
+        if bool(rules.include_staffing):
             args.append("--include-staffing")
         else:
             args.append("--no-include-staffing")
-        if bool(rules.get("include_supply_arrangements", False)):
+        if bool(rules.include_supply_arrangements):
             args.append("--include-supply-arrangements")
         else:
             args.append("--no-include-supply-arrangements")
         if not include_llm:
             args.append("--no-llm")
+        if not include_attachments:
+            args.append("--no-attachments")
         if since_iso:
             args.extend(["--since-iso", since_iso])
 
         with st.spinner("Running digest..."):
             result = subprocess.run(
                 args,
-                cwd=str(REPO_ROOT),
+                cwd=str(ui.REPO_ROOT),
                 capture_output=True,
                 text=True,
             )
@@ -89,10 +91,10 @@ st.subheader("Reprocess by ID")
 st.write("Single-tender reprocessing is not implemented yet.")
 
 st.subheader("Source management")
-sources_df = pd.DataFrame(config.get("sources", []))
+sources_df = pd.DataFrame(config.sources)
 edited_sources = st.data_editor(sources_df, num_rows="dynamic", use_container_width=True)
 if st.button("Save sources"):
-    config["sources"] = edited_sources.to_dict(orient="records")
+    config.sources = edited_sources.to_dict(orient="records")
     ui.save_ui_config(config)
     st.success("Sources saved")
 
@@ -101,31 +103,29 @@ min_score = st.number_input(
     "Min score (non-SAP)",
     min_value=0,
     max_value=100,
-    value=int(rules.get("min_score_non_sap", 70)),
+    value=int(rules.min_score_non_sap),
     step=1,
 )
 max_close_days = st.number_input(
     "Max close days (non-SAP)",
     min_value=1,
     max_value=3650,
-    value=int(rules.get("max_non_sap_close_days", 365)),
+    value=int(rules.max_non_sap_close_days),
     step=1,
 )
 include_staffing = st.checkbox(
     "Include staffing",
-    value=bool(rules.get("include_staffing", False)),
+    value=bool(rules.include_staffing),
 )
 include_supply = st.checkbox(
     "Include supply arrangements",
-    value=bool(rules.get("include_supply_arrangements", False)),
+    value=bool(rules.include_supply_arrangements),
 )
 
 if st.button("Save rule defaults"):
-    config["rules"] = {
-        "min_score_non_sap": int(min_score),
-        "max_non_sap_close_days": int(max_close_days),
-        "include_staffing": bool(include_staffing),
-        "include_supply_arrangements": bool(include_supply),
-    }
+    config.rules.min_score_non_sap = int(min_score)
+    config.rules.max_non_sap_close_days = int(max_close_days)
+    config.rules.include_staffing = bool(include_staffing)
+    config.rules.include_supply_arrangements = bool(include_supply)
     ui.save_ui_config(config)
     st.success("Rule defaults saved")

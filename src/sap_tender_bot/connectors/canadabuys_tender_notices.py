@@ -13,13 +13,10 @@ from typing import Dict, Iterable, List, Optional
 import requests
 from dateutil import parser as dtparser
 
-from config import CACHE_DIR
-from connectors.open_canada_ckan import CKANClient
+from sap_tender_bot.config import build_paths, get_repo_root
+from sap_tender_bot.connectors.open_canada_ckan import CKANClient
 
 CANADABUYS_TENDER_NOTICES_DATASET_ID = "6abd20d4-7a1c-4b38-baa2-9525d0bb2fd2"
-CACHE_DIR = CACHE_DIR / "canadabuys"
-
-
 def _norm_key(s: str) -> str:
     return "".join(ch.lower() for ch in s if ch.isalnum())
 
@@ -38,13 +35,33 @@ def _pick_field(row: Dict[str, str], candidates: List[str]) -> Optional[str]:
     return None
 
 
-def _cache_meta_path(url: str) -> Path:
+def _fix_mojibake(value: str) -> str:
+    if not value:
+        return value
+    if any(token in value for token in ("Ã", "â", "Â")):
+        try:
+            fixed = value.encode("latin-1").decode("utf-8")
+            return fixed
+        except Exception:
+            return value
+    return value
+
+
+def _clean_text(value: str) -> str:
+    if not value:
+        return ""
+    cleaned = value.strip()
+    cleaned = _fix_mojibake(cleaned)
+    return cleaned.strip()
+
+
+def _cache_meta_path(url: str, cache_dir: Path) -> Path:
     digest = hashlib.sha256(url.encode("utf-8")).hexdigest()
-    return CACHE_DIR / f"meta_{digest}.json"
+    return cache_dir / f"meta_{digest}.json"
 
 
-def _load_cache_meta(url: str) -> dict:
-    path = _cache_meta_path(url)
+def _load_cache_meta(url: str, cache_dir: Path) -> dict:
+    path = _cache_meta_path(url, cache_dir)
     if not path.exists():
         return {}
     try:
@@ -53,9 +70,9 @@ def _load_cache_meta(url: str) -> dict:
         return {}
 
 
-def _save_cache_meta(url: str, meta: dict) -> None:
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    path = _cache_meta_path(url)
+def _save_cache_meta(url: str, meta: dict, cache_dir: Path) -> None:
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    path = _cache_meta_path(url, cache_dir)
     path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
 
@@ -125,10 +142,10 @@ def _choose_best_resource(resources: list[dict], prefer: str = "open") -> dict:
 
 
 
-def _download(url: str, dest: Path) -> Path:
+def _download(url: str, dest: Path, cache_dir: Path) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     headers = {"User-Agent": "sap-tender-bot/0.1"}
-    meta = _load_cache_meta(url)
+    meta = _load_cache_meta(url, cache_dir)
     if dest.exists():
         etag = meta.get("etag")
         last_modified = meta.get("last_modified")
@@ -167,7 +184,7 @@ def _download(url: str, dest: Path) -> Path:
             updated_meta["etag"] = etag
         if last_modified:
             updated_meta["last_modified"] = last_modified
-        _save_cache_meta(url, updated_meta)
+        _save_cache_meta(url, updated_meta, cache_dir)
     return dest
 
 
@@ -179,10 +196,10 @@ def _iter_csv_rows_from_file(path: Path) -> Iterable[Dict[str, str]]:
             if not csv_names:
                 raise RuntimeError("ZIP contained no CSV files.")
             with zf.open(csv_names[0], "r") as fp:
-                text = io.TextIOWrapper(fp, encoding="utf-8", errors="replace")
+                text = io.TextIOWrapper(fp, encoding="utf-8-sig", errors="replace")
                 yield from csv.DictReader(text)
     else:
-        with open(path, "r", encoding="utf-8", errors="replace", newline="") as fp:
+        with open(path, "r", encoding="utf-8-sig", errors="replace", newline="") as fp:
             yield from csv.DictReader(fp)
 
 
@@ -214,22 +231,45 @@ def _parse_codes_starred(s: str) -> list[str]:
             codes.append(digits)
     return codes
 
+def _parse_attachments(s: str) -> list[str]:
+    items = []
+    for p in _split_multiline(s):
+        p = p.lstrip("*").strip()
+        if not p:
+            continue
+        items.append(p)
+    return items
+
+def _build_tender_key(source: str, ref: str, solicitation: str, url: str, uid: str) -> str:
+    if uid and ":am" in uid:
+        return uid.rsplit(":am", 1)[0]
+    base = ref or solicitation or url or uid
+    if base:
+        return f"{source}:{base}" if not base.startswith(f"{source}:") else base
+    return f"{source}:unknown"
+
 def _pick_best_url(row: dict[str, str]) -> str:
-    url = _first_nonempty(row.get("noticeURL-URLavis-eng",""), row.get("noticeURL-URLavis-fra",""))
+    url = _first_nonempty(
+        _clean_text(row.get("noticeURL-URLavis-eng","")),
+        _clean_text(row.get("noticeURL-URLavis-fra","")),
+    )
     if url:
         return url
 
     # fallback: attachment field usually contains direct PDF links
-    att = _first_nonempty(row.get("attachment-piecesJointes-eng",""), row.get("attachment-piecesJointes-fra",""))
+    att = _first_nonempty(
+        _clean_text(row.get("attachment-piecesJointes-eng","")),
+        _clean_text(row.get("attachment-piecesJointes-fra","")),
+    )
     for p in _split_multiline(att):
         if p.startswith("http"):
             return p.strip()
     return ""
 
 def _normalize_row(row: dict[str, str]) -> dict[str, object]:
-    ref = (row.get("referenceNumber-numeroReference") or "").strip()
-    amend_no = (row.get("amendmentNumber-numeroModification") or "").strip() or "0"
-    solic = (row.get("solicitationNumber-numeroSollicitation") or "").strip()
+    ref = _clean_text(row.get("referenceNumber-numeroReference") or "")
+    amend_no = _clean_text(row.get("amendmentNumber-numeroModification") or "") or "0"
+    solic = _clean_text(row.get("solicitationNumber-numeroSollicitation") or "")
 
     pub_dt = _parse_dt((row.get("publicationDate-datePublication") or "").strip())
     amend_dt = _parse_dt((row.get("amendmentDate-dateModification") or "").strip())
@@ -240,27 +280,36 @@ def _normalize_row(row: dict[str, str]) -> dict[str, object]:
         if d and (updated_dt is None or d > updated_dt):
             updated_dt = d
 
-    title_en = (row.get("title-titre-eng") or "").strip()
-    title_fr = (row.get("title-titre-fra") or "").strip()
-    desc_en = (row.get("tenderDescription-descriptionAppelOffres-eng") or "").strip()
-    desc_fr = (row.get("tenderDescription-descriptionAppelOffres-fra") or "").strip()
+    title_en = _clean_text(row.get("title-titre-eng") or "")
+    title_fr = _clean_text(row.get("title-titre-fra") or "")
+    desc_en = _clean_text(row.get("tenderDescription-descriptionAppelOffres-eng") or "")
+    desc_fr = _clean_text(row.get("tenderDescription-descriptionAppelOffres-fra") or "")
 
-    status_en = (row.get("tenderStatus-appelOffresStatut-eng") or "").strip()
-    status_fr = (row.get("tenderStatus-appelOffresStatut-fra") or "").strip()
+    status_en = _clean_text(row.get("tenderStatus-appelOffresStatut-eng") or "")
+    status_fr = _clean_text(row.get("tenderStatus-appelOffresStatut-fra") or "")
 
-    org_en = (row.get("contractingEntityName-nomEntitContractante-eng") or "").strip()
-    org_fr = (row.get("contractingEntityName-nomEntitContractante-fra") or "").strip()
+    org_en = _clean_text(row.get("contractingEntityName-nomEntitContractante-eng") or "")
+    org_fr = _clean_text(row.get("contractingEntityName-nomEntitContractante-fra") or "")
 
     url = _pick_best_url(row)
 
-    unspsc_codes = _parse_codes_starred(row.get("unspsc","") or "")
-    gsin_codes = _parse_codes_starred(row.get("gsin-nibs","") or "")
+    unspsc_codes = _parse_codes_starred(_clean_text(row.get("unspsc","") or ""))
+    gsin_codes = _parse_codes_starred(_clean_text(row.get("gsin-nibs","") or ""))
+    attachments = _parse_attachments(
+        _first_nonempty(
+            _clean_text(row.get("attachment-piecesJointes-eng","")),
+            _clean_text(row.get("attachment-piecesJointes-fra","")),
+        )
+        or ""
+    )
 
     # include amendment number so amendments re-trigger
     uid = f"canadabuys:{ref}:am{amend_no}" if ref else f"canadabuys:{url}:am{amend_no}"
+    tender_key = _build_tender_key("canadabuys", ref, solic, url, uid)
 
     return {
         "uid": uid,
+        "tender_key": tender_key,
         "source": "canadabuys",
         "id": ref,
         "amendment_number": amend_no,
@@ -287,22 +336,24 @@ def _normalize_row(row: dict[str, str]) -> dict[str, object]:
         "close_date": close_dt.isoformat() if close_dt else None,
 
         "url": url,
-        "url_en": (row.get("noticeURL-URLavis-eng") or "").strip(),
-        "url_fr": (row.get("noticeURL-URLavis-fra") or "").strip(),
+        "url_en": _clean_text(row.get("noticeURL-URLavis-eng") or ""),
+        "url_fr": _clean_text(row.get("noticeURL-URLavis-fra") or ""),
 
         "unspsc": unspsc_codes,  # list[str]
-        "unspsc_desc_en": (row.get("unspscDescription-eng") or "").strip(),
-        "unspsc_desc_fr": (row.get("unspscDescription-fra") or "").strip(),
+        "unspsc_desc_en": _clean_text(row.get("unspscDescription-eng") or ""),
+        "unspsc_desc_fr": _clean_text(row.get("unspscDescription-fra") or ""),
 
         "gsin": gsin_codes,      # list[str]
-        "gsin_desc_en": (row.get("gsinDescription-nibsDescription-eng") or "").strip(),
-        "gsin_desc_fr": (row.get("gsinDescription-nibsDescription-fra") or "").strip(),
+        "gsin_desc_en": _clean_text(row.get("gsinDescription-nibsDescription-eng") or ""),
+        "gsin_desc_fr": _clean_text(row.get("gsinDescription-nibsDescription-fra") or ""),
 
-        "procurement_category": (row.get("procurementCategory-categorieApprovisionnement") or "").strip(),
-        "notice_type_en": (row.get("noticeType-avisType-eng") or "").strip(),
-        "notice_type_fr": (row.get("noticeType-avisType-fra") or "").strip(),
-        "proc_method_en": (row.get("procurementMethod-methodeApprovisionnement-eng") or "").strip(),
-        "proc_method_fr": (row.get("procurementMethod-methodeApprovisionnement-fra") or "").strip(),
+        "attachments": attachments,
+
+        "procurement_category": _clean_text(row.get("procurementCategory-categorieApprovisionnement") or ""),
+        "notice_type_en": _clean_text(row.get("noticeType-avisType-eng") or ""),
+        "notice_type_fr": _clean_text(row.get("noticeType-avisType-fra") or ""),
+        "proc_method_en": _clean_text(row.get("procurementMethod-methodeApprovisionnement-eng") or ""),
+        "proc_method_fr": _clean_text(row.get("procurementMethod-methodeApprovisionnement-fra") or ""),
 
         "_raw": row,
     }
@@ -311,6 +362,12 @@ def _normalize_row(row: dict[str, str]) -> dict[str, object]:
 @dataclass
 class CanadaBuysTenderNoticesConnector:
     ckan: CKANClient = field(default_factory=CKANClient)
+    cache_dir: Path = field(
+        default_factory=lambda: build_paths(get_repo_root(), {}, apply_defaults=True).cache_dir
+    )
+
+    def __post_init__(self) -> None:
+        self.cache_dir = Path(self.cache_dir) / "canadabuys"
 
     def fetch_open_tender_notices(self, since_iso: Optional[str] = None) -> List[Dict[str, object]]:
         pkg = self.ckan.package_show(CANADABUYS_TENDER_NOTICES_DATASET_ID)
@@ -322,9 +379,9 @@ class CanadaBuysTenderNoticesConnector:
 
         fmt = (res.get("format") or "").lower()
         filename = f"new_tender_notices.{fmt if fmt in {'csv','zip'} else 'csv'}"
-        path = CACHE_DIR / filename
+        path = self.cache_dir / filename
 
-        _download(resource_url, path)
+        _download(resource_url, path, self.cache_dir)
 
         since_dt = _parse_dt(since_iso) if since_iso else None
 

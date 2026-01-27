@@ -11,7 +11,7 @@ role = filters.get("role")
 st.title("Settings")
 
 config = ui.load_ui_config()
-notifications = config.get("notifications", {})
+notifications = config.notifications
 
 st.subheader("Notifications")
 disabled = role != "Admin"
@@ -20,26 +20,26 @@ if disabled:
 
 email_recipients = st.text_area(
     "Email recipients (comma-separated)",
-    value=",".join(notifications.get("email_recipients", [])),
+    value=",".join(notifications.email_recipients),
     disabled=disabled,
 )
 slack_webhook = st.text_input(
     "Slack webhook URL",
-    value=notifications.get("slack_webhook", ""),
+    value=notifications.slack_webhook,
     disabled=disabled,
 )
 digest_schedule = st.text_input(
     "Digest schedule",
-    value=notifications.get("digest_schedule", "daily 08:35"),
+    value=notifications.digest_schedule,
     disabled=disabled,
 )
 
 if st.button("Save notifications", disabled=disabled):
-    config["notifications"] = {
-        "email_recipients": [v.strip() for v in email_recipients.split(",") if v.strip()],
-        "slack_webhook": slack_webhook.strip(),
-        "digest_schedule": digest_schedule.strip(),
-    }
+    config.notifications.email_recipients = [
+        v.strip() for v in email_recipients.split(",") if v.strip()
+    ]
+    config.notifications.slack_webhook = slack_webhook.strip()
+    config.notifications.digest_schedule = digest_schedule.strip()
     ui.save_ui_config(config)
     st.success("Notifications saved")
 

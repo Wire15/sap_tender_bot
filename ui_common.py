@@ -1,8 +1,8 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import os
-import sys
+import sqlite3
 from collections import deque
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -11,17 +11,15 @@ from typing import Any, Optional
 import pandas as pd
 import streamlit as st
 
-ROOT = Path(__file__).resolve().parent
-SRC = ROOT / "src"
-if SRC.exists() and str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
+from sap_tender_bot.config import AppConfig, load_config, save_config
 
-from config import DATA_DIR, LOG_DIR  # noqa: E402
-
-EXPORT_DIR = DATA_DIR / "exports"
-STATE_PATH = DATA_DIR / "state.json"
-UI_CONFIG_PATH = DATA_DIR / "ui_config.json"
-UI_STATE_PATH = DATA_DIR / "ui_state.json"
+APP_CONFIG = load_config(apply_env=True)
+PATHS = APP_CONFIG.paths
+REPO_ROOT = PATHS.repo_root
+EXPORT_DIR = PATHS.exports_dir
+STATE_PATH = PATHS.state_path
+UI_STATE_PATH = PATHS.ui_state_path
+DB_PATH = PATHS.db_path
 
 DATE_FIELD_MAP = {
     "Updated": "updated_at",
@@ -37,8 +35,7 @@ def set_page_config(title: str) -> None:
 
 
 def get_env_label() -> str:
-    value = os.getenv("APP_ENV")
-    return value.strip() if value else "dev"
+    return APP_CONFIG.app_env or "dev"
 
 
 def render_sidebar() -> dict:
@@ -72,6 +69,24 @@ def render_sidebar() -> dict:
 
 
 def load_state() -> dict:
+    if DB_PATH.exists():
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                conn.row_factory = sqlite3.Row
+                row = conn.execute(
+                    """
+                    SELECT finished_at
+                    FROM runs
+                    WHERE status = 'ok' AND dry_run = 0 AND finished_at IS NOT NULL
+                    ORDER BY finished_at DESC
+                    LIMIT 1
+                    """
+                ).fetchone()
+            if row:
+                return {"last_run_iso": row["finished_at"]}
+        except sqlite3.Error:
+            pass
+
     if not STATE_PATH.exists():
         return {}
     content = STATE_PATH.read_text(encoding="utf-8").strip()
@@ -93,43 +108,12 @@ def _merge_dict(defaults: dict, override: dict) -> dict:
     return merged
 
 
-def load_ui_config() -> dict:
-    defaults = {
-        "sources": [
-            {
-                "name": "CanadaBuys CKAN",
-                "enabled": True,
-                "priority": 1,
-                "notes": "Open tender notices",
-            }
-        ],
-        "notifications": {
-            "email_recipients": [],
-            "slack_webhook": "",
-            "digest_schedule": "daily 08:35",
-        },
-        "rules": {
-            "min_score_non_sap": 70,
-            "max_non_sap_close_days": 365,
-            "include_staffing": False,
-            "include_supply_arrangements": False,
-        },
-    }
-    if not UI_CONFIG_PATH.exists():
-        return defaults
-    content = UI_CONFIG_PATH.read_text(encoding="utf-8").strip()
-    if not content:
-        return defaults
-    try:
-        data = json.loads(content)
-    except json.JSONDecodeError:
-        return defaults
-    return _merge_dict(defaults, data)
+def load_ui_config() -> AppConfig:
+    return load_config(apply_env=False)
 
 
-def save_ui_config(config: dict) -> None:
-    UI_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    UI_CONFIG_PATH.write_text(json.dumps(config, indent=2), encoding="utf-8")
+def save_ui_config(config: AppConfig) -> None:
+    save_config(config)
 
 
 def load_ui_state() -> dict:
@@ -280,6 +264,31 @@ def load_reject_report(path: Optional[Path]) -> dict:
         return {}
 
 
+def load_tender_payload(*, tender_key: Optional[str] = None, uid: Optional[str] = None) -> dict:
+    if not DB_PATH.exists():
+        return {}
+    if not tender_key and not uid:
+        return {}
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            if tender_key:
+                row = conn.execute(
+                    "SELECT last_payload FROM tenders WHERE tender_key = ?",
+                    (str(tender_key),),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT last_payload FROM tenders WHERE uid = ?",
+                    (str(uid),),
+                ).fetchone()
+        if not row or not row["last_payload"]:
+            return {}
+        return json.loads(row["last_payload"])
+    except Exception:
+        return {}
+
+
 def apply_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
     if df.empty:
         return df
@@ -339,9 +348,9 @@ def counts_by_date(df: pd.DataFrame, field: str) -> pd.DataFrame:
 
 
 def list_log_files() -> list[Path]:
-    if not LOG_DIR.exists():
+    if not PATHS.log_dir.exists():
         return []
-    return sorted(LOG_DIR.glob("run_*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+    return sorted(PATHS.log_dir.glob("run_*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
 
 
 def read_log_tail(path: Path, max_lines: int = 400) -> str:
