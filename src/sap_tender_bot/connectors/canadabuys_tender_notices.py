@@ -4,6 +4,7 @@ import csv
 import hashlib
 import io
 import json
+import re
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -232,12 +233,33 @@ def _parse_codes_starred(s: str) -> list[str]:
     return codes
 
 def _parse_attachments(s: str) -> list[str]:
-    items = []
-    for p in _split_multiline(s):
-        p = p.lstrip("*").strip()
-        if not p:
+    if not s:
+        return []
+
+    items: list[str] = []
+    seen: set[str] = set()
+
+    # Prefer explicit URL extraction to avoid comma-separated blobs.
+    for match in re.findall(r"https?://[^\s,;]+", s):
+        cleaned = match.strip().rstrip(").]")
+        if cleaned and cleaned not in seen:
+            items.append(cleaned)
+            seen.add(cleaned)
+
+    if items:
+        return items
+
+    for line in _split_multiline(s):
+        line = line.lstrip("*").strip()
+        if not line:
             continue
-        items.append(p)
+        for part in line.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            if part not in seen:
+                items.append(part)
+                seen.add(part)
     return items
 
 def _build_tender_key(source: str, ref: str, solicitation: str, url: str, uid: str) -> str:

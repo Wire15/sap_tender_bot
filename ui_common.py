@@ -264,6 +264,16 @@ def load_reject_report(path: Optional[Path]) -> dict:
         return {}
 
 
+def load_attachment_coverage_report() -> dict:
+    path = latest_export("attachment_coverage_*.json")
+    if not path or not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
 def load_tender_payload(*, tender_key: Optional[str] = None, uid: Optional[str] = None) -> dict:
     if not DB_PATH.exists():
         return {}

@@ -1,0 +1,99 @@
+2026-01-28 13:34:27,757 | INFO | Logging to C:\dev\sap-tender-bot\logs\run_20260128.log
+2026-01-28 13:34:27,770 | INFO | Applying DB migration 1
+2026-01-28 13:34:27,795 | INFO | Applying DB migration 2
+2026-01-28 13:34:27,806 | INFO | No prior run found; consider --bootstrap to seed state.
+2026-01-28 13:34:27,807 | INFO | SQLite store: C:\dev\sap-tender-bot\data\sap_tender.db
+2026-01-28 13:34:27,807 | INFO | Last successful run: None
+2026-01-28 13:34:27,807 | INFO | Fetching CanadaBuys tenders since=None
+2026-01-28 13:34:45,929 | INFO | Reject: exclude_supply_arrangement=283
+2026-01-28 13:34:45,929 | INFO | Reject: exclude_goods_or_hardware=214
+2026-01-28 13:34:45,930 | INFO | Reject: exclude_negative_title=164
+2026-01-28 13:34:45,930 | INFO | Reject: exclude_no_erp_domain=132
+2026-01-28 13:34:45,931 | INFO | Reject: exclude_non_it_unspsc=76
+2026-01-28 13:34:45,931 | INFO | Reject: exclude_award_notice=26
+2026-01-28 13:34:45,932 | INFO | Reject: exclude_no_it_context=1
+2026-01-28 13:34:45,932 | INFO | Reject: exclude_far_future_close=1
+2026-01-28 13:34:45,933 | INFO | Reject: exclude_below_score_threshold=1
+2026-01-28 13:34:45,933 | INFO | Events: new=912 updated=0 candidates=912 flagged=14
+2026-01-28 13:34:45,934 | INFO | LLM: requesting summary for canadabuys:cb-272-99557926:am001
+2026-01-28 13:34:53,201 | INFO | LLM: completed canadabuys:cb-272-99557926:am001 in 7.3s
+2026-01-28 13:34:53,203 | INFO | LLM: requesting summary for canadabuys:cb-495-14096276:am000
+2026-01-28 13:35:01,072 | INFO | LLM: completed canadabuys:cb-495-14096276:am000 in 7.9s
+2026-01-28 13:35:01,080 | INFO | LLM: requesting summary for canadabuys:cb-848-48753531:am002
+2026-01-28 13:35:07,737 | INFO | LLM: completed canadabuys:cb-848-48753531:am002 in 6.7s
+2026-01-28 13:35:07,751 | INFO | LLM: requesting summary for canadabuys:cb-355-38336458:am003
+2026-01-28 13:35:12,589 | INFO | LLM: completed canadabuys:cb-355-38336458:am003 in 4.8s
+2026-01-28 13:35:12,592 | INFO | LLM: requesting summary for canadabuys:cb-743-95240145:am007
+2026-01-28 13:35:21,316 | WARNING | LLM: invalid JSON, attempting repair (Expecting ',' delimiter: line 31 column 4 (char 1207))
+2026-01-28 13:35:28,202 | INFO | LLM: completed canadabuys:cb-743-95240145:am007 in 15.6s
+2026-01-28 13:35:28,204 | INFO | LLM: requesting summary for canadabuys:cb-845-15654166:am001
+2026-01-28 13:35:32,321 | INFO | LLM: completed canadabuys:cb-845-15654166:am001 in 4.1s
+2026-01-28 13:35:32,323 | INFO | LLM: requesting summary for canadabuys:cb-565-60949693:am001
+2026-01-28 13:35:38,443 | INFO | LLM: completed canadabuys:cb-565-60949693:am001 in 6.1s
+2026-01-28 13:35:38,449 | INFO | LLM: requesting summary for canadabuys:cb-942-84321058:am000
+2026-01-28 13:35:49,348 | INFO | LLM: completed canadabuys:cb-942-84321058:am000 in 10.9s
+2026-01-28 13:35:49,352 | INFO | LLM: requesting summary for canadabuys:cb-768-1387214:am000
+2026-01-28 13:35:53,982 | INFO | LLM: completed canadabuys:cb-768-1387214:am000 in 4.6s
+2026-01-28 13:35:53,986 | INFO | LLM: requesting summary for canadabuys:WS3430950409-Doc5111374856:am001
+2026-01-28 13:36:01,746 | INFO | LLM: completed canadabuys:WS3430950409-Doc5111374856:am001 in 7.8s
+2026-01-28 13:36:01,748 | INFO | LLM: requesting summary for canadabuys:WS3430950409-Doc5488327508:am001
+2026-01-28 13:36:06,108 | INFO | LLM: completed canadabuys:WS3430950409-Doc5488327508:am001 in 4.4s
+2026-01-28 13:36:06,109 | INFO | LLM: requesting summary for canadabuys:cb-181-13480778:am001
+2026-01-28 13:36:13,064 | INFO | LLM: completed canadabuys:cb-181-13480778:am001 in 7.0s
+2026-01-28 13:36:13,078 | INFO | LLM: requesting summary for canadabuys:MX-443845185006:am000
+2026-01-28 13:36:16,945 | INFO | LLM: completed canadabuys:MX-443845185006:am000 in 3.9s
+2026-01-28 13:36:16,947 | INFO | LLM: requesting summary for canadabuys:cb-538-17315914:am012
+2026-01-28 13:36:22,548 | INFO | LLM: completed canadabuys:cb-538-17315914:am012 in 5.6s
+2026-01-28 13:36:22,553 | INFO | LLM: requested=14 cached=0 skipped=0 daily_remaining=106 req_with=7 conf_hi=1 conf_med=6 conf_low=7
+2026-01-28 13:36:23,772 | INFO | Attachment extract: kept=4000 chars sections=0 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/86023/cfp-6--final-technical-report-%28ftr-template-eng.pdf
+2026-01-28 13:36:23,786 | INFO | Attachment LLM: requesting summary for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/86023/cfp-6--final-technical-report-%28ftr-template-eng.pdf
+2026-01-28 13:36:24,462 | INFO | Attachment extract: kept=3930 chars sections=2 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/85685/defence-supply-chain-control-tower---request-for-information_0.pdf
+2026-01-28 13:36:24,464 | INFO | Attachment extract: kept=3930 chars sections=2 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/85685/defence-supply-chain-control-tower---request-for-information.pdf
+2026-01-28 13:36:24,468 | INFO | Attachment LLM: requesting summary for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/85685/defence-supply-chain-control-tower---request-for-information_0.pdf
+2026-01-28 13:36:24,496 | INFO | Attachment LLM: requesting summary for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/85685/defence-supply-chain-control-tower---request-for-information.pdf
+2026-01-28 13:36:25,493 | INFO | Attachment extract: kept=3893 chars sections=4 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/86023/w7714-248676-ideas-call-for-proposals-006---amendment-2.pdf
+2026-01-28 13:36:25,494 | INFO | Attachment LLM: requesting summary for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/86023/w7714-248676-ideas-call-for-proposals-006---amendment-2.pdf
+2026-01-28 13:36:27,749 | WARNING | Attachment LLM: retryable HTTP 502 on https://api.cohere.com/v2/chat (attempt 1/4, sleeping 1.29s)
+2026-01-28 13:36:29,878 | INFO | Attachment extract: kept=3921 chars sections=0 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/86023/cfp6-ch11---secure-path-to-the-stars.pdf
+2026-01-28 13:36:29,879 | INFO | Attachment LLM: requesting summary for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/86023/cfp6-ch11---secure-path-to-the-stars.pdf
+2026-01-28 13:36:42,810 | INFO | Attachment extract: kept=3938 chars sections=4 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/82608/cdic-rfp-2025-4714-databricks-professional-services---main-document.pdf
+2026-01-28 13:36:42,810 | INFO | Attachment LLM: requesting summary for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/82608/cdic-rfp-2025-4714-databricks-professional-services---main-document.pdf
+2026-01-28 13:37:14,724 | WARNING | Attachment LLM: attempt 1/4 failed for https://api.cohere.com/v2/chat (HTTPSConnectionPool(host='api.cohere.com', port=443): Read timed out. (read timeout=45))
+2026-01-28 13:37:15,758 | INFO | Attachment extract: kept=3943 chars sections=1 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/82608/cdic-rfp-2025-4714-addendum-1.pdf
+2026-01-28 13:37:15,758 | INFO | Attachment LLM: requesting summary for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/82608/cdic-rfp-2025-4714-addendum-1.pdf
+2026-01-28 13:37:21,519 | INFO | Attachment zip: files=2 bytes=173338 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/82608/cdic-rfp-2025-4714-request-for-proposals---forms.zip
+2026-01-28 13:37:21,520 | INFO | Attachment extract: kept=3960 chars sections=1 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/82608/cdic-rfp-2025-4714-request-for-proposals---forms.zip
+2026-01-28 13:37:21,520 | INFO | Attachment LLM: requesting summary for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/82608/cdic-rfp-2025-4714-request-for-proposals---forms.zip
+2026-01-28 13:37:25,366 | INFO | Attachment zip: files=2 bytes=564668 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/83687/w6369-26p5qh-npp_final-jan-6-2026-%282.zip
+2026-01-28 13:37:25,367 | INFO | Attachment extract: kept=4000 chars sections=0 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/83687/w6369-26p5qh-npp_final-jan-6-2026-%282.zip
+2026-01-28 13:37:25,367 | INFO | Attachment LLM: requesting summary for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/83687/w6369-26p5qh-npp_final-jan-6-2026-%282.zip
+2026-01-28 13:37:28,475 | INFO | Attachment zip: files=2 bytes=631491 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/83687/w6369-26p5qh-solicitation-amendment-005_1.zip
+2026-01-28 13:37:28,476 | INFO | Attachment extract: kept=4000 chars sections=0 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/83687/w6369-26p5qh-solicitation-amendment-005_1.zip
+2026-01-28 13:37:28,476 | INFO | Attachment LLM: requesting summary for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/83687/w6369-26p5qh-solicitation-amendment-005_1.zip
+2026-01-28 13:37:32,702 | INFO | Attachment zip: files=2 bytes=457582 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/83687/w6369-26p5qh-solicitation-amendment-003.zip
+2026-01-28 13:37:32,704 | INFO | Attachment extract: kept=4000 chars sections=0 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/83687/w6369-26p5qh-solicitation-amendment-003.zip
+2026-01-28 13:37:32,705 | INFO | Attachment LLM: requesting summary for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/83687/w6369-26p5qh-solicitation-amendment-003.zip
+2026-01-28 13:37:38,542 | INFO | Attachment extract: kept=4000 chars sections=0 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/85456/t8080-250264---npp---amendment-1---january-26%2C-2026.pdf
+2026-01-28 13:37:38,545 | INFO | Attachment LLM: requesting summary for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/85456/t8080-250264---npp---amendment-1---january-26%2C-2026.pdf
+2026-01-28 13:37:44,297 | INFO | Attachment extract: kept=4000 chars sections=0 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/85456/t8080-250264---npp---january-22%2C-2026.pdf
+2026-01-28 13:37:44,298 | INFO | Attachment LLM: requesting summary for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/85456/t8080-250264---npp---january-22%2C-2026.pdf
+2026-01-28 13:37:47,271 | WARNING | Attachment download HTTP 403 for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/86012/w7714-248676-ideas-call-for-proposals-006---amendment-2.pdf; retrying with browser headers
+2026-01-28 13:37:48,203 | INFO | Attachment extract: kept=4000 chars sections=0 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/86012/cfp-6--final-technical-report-%28ftr-template-eng.pdf
+2026-01-28 13:37:48,210 | INFO | Attachment LLM: requesting summary for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/86012/cfp-6--final-technical-report-%28ftr-template-eng.pdf
+2026-01-28 13:37:49,182 | INFO | Attachment extract: kept=3893 chars sections=4 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/86012/w7714-248676-ideas-call-for-proposals-006---amendment-2.pdf
+2026-01-28 13:37:49,183 | INFO | Attachment LLM: requesting summary for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/86012/w7714-248676-ideas-call-for-proposals-006---amendment-2.pdf
+2026-01-28 13:37:59,100 | INFO | Attachment extract: kept=3999 chars sections=0 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/86012/cfp6-ch10--pacific-foresight.pdf
+2026-01-28 13:37:59,101 | INFO | Attachment LLM: requesting summary for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/86012/cfp6-ch10--pacific-foresight.pdf
+2026-01-28 13:37:59,499 | WARNING | Attachment download HTTP 403 for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/84936/25-58146_npp_project-delivery-services.pdf; retrying with browser headers
+2026-01-28 13:38:00,034 | INFO | Attachment extract: kept=4000 chars sections=0 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/84936/25-58146_npp_project-delivery-services.pdf
+2026-01-28 13:38:00,034 | INFO | Attachment LLM: requesting summary for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/84936/25-58146_npp_project-delivery-services.pdf
+2026-01-28 13:38:01,847 | INFO | Attachment skipped (unsupported_type): https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/85494/appendix-f---rfp003801---tech-info-security.xlsx
+2026-01-28 13:38:02,200 | WARNING | Attachment download HTTP 403 for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/85494/appendix-i---rfp003801---compliance.xlsx; retrying with browser headers
+2026-01-28 13:38:02,590 | INFO | Attachment skipped (unsupported_type): https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/85494/appendix-i---rfp003801---compliance.xlsx
+2026-01-28 13:38:05,110 | INFO | Attachment extract: kept=3960 chars sections=4 url=https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/85494/cmhc---rfp003801---sas-to-pyspark-code-conversion.pdf
+2026-01-28 13:38:05,111 | INFO | Attachment LLM: requesting summary for https://canadabuys.canada.ca/sites/default/files/webform/tender_notice/85494/cmhc---rfp003801---sas-to-pyspark-code-conversion.pdf
+2026-01-28 13:38:11,175 | INFO | Attachments: total=20 processed=18 skipped=2 downloaded=18 cached=0 llm_req=18 llm_cached=0 llm_skipped=0 ocr_used=0 zip_attachments=4 zip_files=8 zip_bytes=1827079 empty=0 bytes=7547807 chars=712714
+2026-01-28 13:38:11,179 | INFO | Exported near-miss CSV to C:\dev\sap-tender-bot\data\exports\near_miss_20260128.csv
+2026-01-28 13:38:11,181 | INFO | Exported reject report to C:\dev\sap-tender-bot\data\exports\reject_report_20260128_133811.json
+2026-01-28 13:38:11,186 | INFO | Dry-run: wrote HTML to C:\dev\sap-tender-bot\data\exports\digest_20260128_133811.html
+2026-01-28 13:38:11,186 | INFO | Dry-run: state not updated.

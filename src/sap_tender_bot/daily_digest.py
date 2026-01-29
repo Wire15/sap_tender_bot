@@ -204,6 +204,290 @@ def _score_for_llm(t: dict) -> int:
     return 0
 
 
+def _attachment_signal(t: dict) -> str:
+    summaries = t.get("attachment_summaries") or []
+    requirements = t.get("attachment_requirements") or []
+    if not summaries and not requirements:
+        return ""
+    attachment_names = set()
+    for summary in summaries:
+        if isinstance(summary, dict) and summary.get("attachment_name"):
+            attachment_names.add(str(summary.get("attachment_name")))
+    if not attachment_names:
+        for req in requirements:
+            if isinstance(req, dict) and req.get("attachment_name"):
+                attachment_names.add(str(req.get("attachment_name")))
+
+    dates_found = False
+    risks_found = False
+    for summary in summaries:
+        if not isinstance(summary, dict):
+            continue
+        payload = summary.get("summary") or {}
+        if payload.get("dates"):
+            dates_found = True
+        if payload.get("key_risks"):
+            risks_found = True
+
+    attachment_count = len(attachment_names) if attachment_names else len(summaries)
+    req_count = len(requirements)
+    dates_flag = "yes" if dates_found else "no"
+    risks_flag = "yes" if risks_found else "no"
+    return (
+        "Attachment signal: "
+        f"{attachment_count} attachments, reqs={req_count}, dates={dates_flag}, risks={risks_flag}"
+    )
+
+
+def _format_provenance(citations, *, attachment_name: str) -> str:
+    if not citations or not isinstance(citations, list):
+        return f"{attachment_name} | provenance unavailable"
+    first = citations[0] if citations else {}
+    if not isinstance(first, dict):
+        return f"{attachment_name} | provenance unavailable"
+    section = first.get("section_heading") or "n/a"
+    page = first.get("page")
+    page_label = f"p.{page}" if page is not None else "p.?"
+    return f"{attachment_name} | {section} | {page_label}"
+
+
+def _collect_structured_notes(tenders: list[dict], max_items: int = 20) -> list[dict]:
+    rows: list[dict] = []
+    for t in tenders:
+        for summary in t.get("attachment_summaries") or []:
+            if not isinstance(summary, dict):
+                continue
+            attachment_name = summary.get("attachment_name") or "Attachment"
+            structured = summary.get("structured_summary")
+            if not structured and isinstance(summary.get("summary"), dict):
+                structured = summary["summary"].get("structured_summary")
+            if not isinstance(structured, dict):
+                continue
+            for category in (
+                "submission",
+                "evaluation",
+                "scope",
+                "deliverables",
+                "schedule",
+                "risks",
+                "compliance",
+            ):
+                items = structured.get(category) or []
+                for item in items[:2]:
+                    if not isinstance(item, dict):
+                        text = str(item).strip()
+                        citations = []
+                    else:
+                        text = str(item.get("text") or "").strip()
+                        citations = item.get("citations") or []
+                    if not text:
+                        continue
+                    rows.append(
+                        {
+                            "title": t.get("title"),
+                            "org": t.get("org"),
+                            "url": t.get("url"),
+                            "attachment_name": attachment_name,
+                            "category": category,
+                            "text": text,
+                            "provenance": _format_provenance(
+                                citations, attachment_name=attachment_name
+                            ),
+                        }
+                    )
+                    if len(rows) >= max_items:
+                        return rows
+    return rows
+
+
+def _extract_structured_summary(summary: dict) -> dict:
+    if not isinstance(summary, dict):
+        return {}
+    structured = summary.get("structured_summary")
+    if isinstance(structured, dict):
+        return structured
+    return {}
+
+
+def _compute_attachment_stats(tenders: Iterable[dict]) -> dict:
+    tenders = list(tenders)
+    totals = {
+        "tenders": len(tenders),
+        "with_attachments": 0,
+        "with_summaries": 0,
+        "with_requirements": 0,
+        "with_dates": 0,
+        "with_evaluation": 0,
+        "with_submission": 0,
+        "with_any_signal": 0,
+        "attachments_total": 0,
+        "attachments_processed": 0,
+        "attachments_skipped": 0,
+        "unsupported": 0,
+        "too_large": 0,
+        "download_failed": 0,
+        "empty_text": 0,
+        "extraction_failed": 0,
+        "llm_gated": 0,
+        "llm_failed": 0,
+        "low_signal": 0,
+        "summary_exists": 0,
+        "requirements_extracted": 0,
+    }
+    for t in tenders:
+        attachments = t.get("attachments") or []
+        if attachments:
+            totals["with_attachments"] += 1
+            totals["attachments_total"] += len(attachments)
+
+        summaries = t.get("attachment_summaries") or []
+        if summaries:
+            totals["with_summaries"] += 1
+
+        if t.get("attachment_requirements"):
+            totals["with_requirements"] += 1
+
+        dates_found = False
+        evaluation_found = False
+        submission_found = False
+        any_signal = False
+        for summary in summaries:
+            if not isinstance(summary, dict):
+                continue
+            payload = summary.get("summary") or {}
+            if payload.get("dates"):
+                dates_found = True
+            structured = summary.get("structured_summary") or _extract_structured_summary(payload)
+            if isinstance(structured, dict):
+                if structured.get("evaluation"):
+                    evaluation_found = True
+                if structured.get("submission"):
+                    submission_found = True
+        if dates_found:
+            totals["with_dates"] += 1
+            any_signal = True
+        if evaluation_found:
+            totals["with_evaluation"] += 1
+            any_signal = True
+        if submission_found:
+            totals["with_submission"] += 1
+            any_signal = True
+        if t.get("attachment_requirements"):
+            any_signal = True
+        if any_signal:
+            totals["with_any_signal"] += 1
+
+        metrics = t.get("attachment_metrics") or {}
+        totals["attachments_processed"] += int(metrics.get("processed", 0) or 0)
+        totals["attachments_skipped"] += int(metrics.get("skipped", 0) or 0)
+        totals["unsupported"] += int(metrics.get("unsupported", 0) or 0)
+        totals["too_large"] += int(metrics.get("too_large", 0) or 0)
+        totals["download_failed"] += int(metrics.get("download_failed", 0) or 0)
+        totals["empty_text"] += int(metrics.get("empty_text", 0) or 0)
+        totals["extraction_failed"] += int(metrics.get("extraction_failed", 0) or 0)
+        totals["llm_gated"] += int(metrics.get("llm_gated", 0) or 0)
+        totals["llm_failed"] += int(metrics.get("llm_failed", 0) or 0)
+        totals["low_signal"] += int(metrics.get("low_signal", 0) or 0)
+        totals["summary_exists"] += int(metrics.get("summary_exists", 0) or 0)
+        totals["requirements_extracted"] += int(metrics.get("requirements_extracted", 0) or 0)
+
+    def _rate(numer: int, denom: int) -> float:
+        return round((numer / denom) * 100, 2) if denom else 0.0
+
+    totals["rates"] = {
+        "requirements": _rate(totals["with_requirements"], totals["tenders"]),
+        "dates": _rate(totals["with_dates"], totals["tenders"]),
+        "evaluation": _rate(totals["with_evaluation"], totals["tenders"]),
+        "submission": _rate(totals["with_submission"], totals["tenders"]),
+        "summaries": _rate(totals["with_summaries"], totals["tenders"]),
+        "any_signal": _rate(totals["with_any_signal"], totals["tenders"]),
+    }
+    totals["low_signal_rate"] = _rate(totals["low_signal"], totals["summary_exists"])
+    return totals
+
+
+def _weekly_delta(current: dict, previous: dict) -> dict:
+    delta = {}
+    for key, value in (current.get("rates") or {}).items():
+        prev_value = (previous.get("rates") or {}).get(key, 0.0)
+        try:
+            delta[key] = round(float(value) - float(prev_value), 2)
+        except Exception:
+            delta[key] = 0.0
+    return delta
+
+
+def _truncate_note(text: str, max_len: int = 320) -> str:
+    if not text or len(text) <= max_len:
+        return text
+    trimmed = text[:max_len].rsplit(" ", 1)[0].strip()
+    return trimmed or text[:max_len].strip()
+
+
+def _has_sap_signal(t: dict) -> bool:
+    terms = (
+        "sap",
+        "s/4",
+        "s4",
+        "s/4hana",
+        "hana",
+        "ecc",
+        "erp",
+        "ariba",
+        "successfactors",
+    )
+    parts = [
+        t.get("title", ""),
+        t.get("org", ""),
+        t.get("rationale", ""),
+    ]
+    llm = t.get("llm") or {}
+    parts.append(llm.get("summary", ""))
+    for req in t.get("attachment_requirements") or []:
+        if isinstance(req, dict):
+            parts.append(req.get("requirement", ""))
+        else:
+            parts.append(str(req))
+    for summary in t.get("attachment_summaries") or []:
+        if isinstance(summary, dict):
+            parts.extend(summary.get("summary", {}).get("requirements", []))
+    text = " ".join(str(p) for p in parts if p)
+    lowered = text.lower()
+    if any(term in lowered for term in terms):
+        return True
+    bucket = str(t.get("semantic_bucket") or "").lower()
+    return bucket in {"erp modernization", "procurement", "hr/payroll", "integration/data", "ams"}
+
+
+def _build_attachment_note(t: dict) -> str:
+    lines: list[str] = []
+    for summary in t.get("attachment_summaries") or []:
+        if not isinstance(summary, dict):
+            continue
+        name = summary.get("attachment_name") or "Attachment"
+        payload = summary.get("summary") or {}
+        reqs = payload.get("requirements") or []
+        dates = payload.get("dates") or []
+        parts: list[str] = []
+        if reqs:
+            parts.append(f"Reqs: {', '.join(str(r) for r in reqs[:2])}")
+        if dates:
+            parts.append(f"Dates: {', '.join(str(d) for d in dates[:2])}")
+        if parts:
+            lines.append(f"{name}: " + " | ".join(parts))
+        if len(lines) >= 2:
+            break
+    if not lines:
+        for summary in t.get("attachment_summaries") or []:
+            if isinstance(summary, dict) and summary.get("memo"):
+                lines.append(str(summary.get("memo")))
+                break
+    if _has_sap_signal(t):
+        lines.append("Why it matters: SAP/ERP signal found.")
+    note = " ".join(line.strip() for line in lines if line).strip()
+    return _truncate_note(note, max_len=320)
+
+
 def _export_csv(tenders: Iterable[dict], path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     fields = [
@@ -670,10 +954,11 @@ def main() -> int:
                 config=settings.attachments,
                 store=store,
                 cache_dir=paths.cache_dir,
+                embeddings_config=settings.embeddings,
                 logger=logger,
             )
             logger.info(
-                "Attachments: total=%s processed=%s skipped=%s downloaded=%s cached=%s llm_req=%s llm_cached=%s llm_skipped=%s ocr_used=%s empty=%s bytes=%s chars=%s",
+                "Attachments: total=%s processed=%s skipped=%s downloaded=%s cached=%s llm_req=%s llm_cached=%s llm_skipped=%s ocr_used=%s zip_attachments=%s zip_files=%s zip_bytes=%s empty=%s bytes=%s chars=%s",
                 att_stats.get("attachments_total"),
                 att_stats.get("attachments_processed"),
                 att_stats.get("attachments_skipped"),
@@ -683,6 +968,9 @@ def main() -> int:
                 att_stats.get("llm_cached"),
                 att_stats.get("llm_skipped"),
                 att_stats.get("ocr_used"),
+                att_stats.get("zip_attachments"),
+                att_stats.get("zip_files"),
+                att_stats.get("zip_bytes"),
                 att_stats.get("empty_text"),
                 att_stats.get("bytes"),
                 att_stats.get("chars"),
@@ -753,6 +1041,142 @@ def main() -> int:
         "total": len(flagged),
     }
 
+    attachment_notes = []
+    for t in flagged_top:
+        note = _build_attachment_note(t)
+        if note:
+            signal = _attachment_signal(t)
+            memo = note
+            if signal:
+                memo = f"{signal}. {memo}" if memo else signal
+            attachment_notes.append(
+                {
+                    "title": t.get("title"),
+                    "org": t.get("org"),
+                    "url": t.get("url"),
+                    "memo": memo,
+                }
+            )
+
+    attachment_structured = _collect_structured_notes(flagged_top, max_items=25)
+
+    now_utc = datetime.now(timezone.utc)
+    baseline_start = now_utc - timedelta(days=30)
+    current_week_start = now_utc - timedelta(days=7)
+    previous_week_start = now_utc - timedelta(days=14)
+
+    baseline_payloads = store.fetch_tender_payloads_between(
+        start_iso=baseline_start.isoformat(), end_iso=now_utc.isoformat()
+    )
+    current_week_payloads = store.fetch_tender_payloads_between(
+        start_iso=current_week_start.isoformat(), end_iso=now_utc.isoformat()
+    )
+    previous_week_payloads = store.fetch_tender_payloads_between(
+        start_iso=previous_week_start.isoformat(), end_iso=current_week_start.isoformat()
+    )
+
+    baseline_stats = _compute_attachment_stats(baseline_payloads)
+    current_week_stats = _compute_attachment_stats(current_week_payloads)
+    previous_week_stats = _compute_attachment_stats(previous_week_payloads)
+    weekly_delta = _weekly_delta(current_week_stats, previous_week_stats)
+    current_run_stats = _compute_attachment_stats(flagged)
+
+    if logger:
+        logger.info(
+            "Attachment coverage (30d): req=%s%% dates=%s%% eval=%s%% submission=%s%% summaries=%s%% low_signal=%s%% samples=%s",
+            baseline_stats["rates"].get("requirements"),
+            baseline_stats["rates"].get("dates"),
+            baseline_stats["rates"].get("evaluation"),
+            baseline_stats["rates"].get("submission"),
+            baseline_stats["rates"].get("summaries"),
+            baseline_stats.get("low_signal_rate"),
+            baseline_stats.get("tenders"),
+        )
+        logger.info(
+            "Attachment coverage weekly delta: req=%s%% dates=%s%% eval=%s%% submission=%s%% summaries=%s%%",
+            weekly_delta.get("requirements"),
+            weekly_delta.get("dates"),
+            weekly_delta.get("evaluation"),
+            weekly_delta.get("submission"),
+            weekly_delta.get("summaries"),
+        )
+
+    coverage_report = {
+        "generated_at": now_utc_iso(),
+        "baseline_window_days": 30,
+        "baseline": baseline_stats,
+        "current_week": current_week_stats,
+        "previous_week": previous_week_stats,
+        "weekly_delta": weekly_delta,
+        "current_run": current_run_stats,
+    }
+
+    run_started_dt = _parse_iso_dt(run_started) or now_utc
+    run_duration_s = int((now_utc - run_started_dt).total_seconds())
+    recent_durations = store.fetch_recent_run_durations(limit=5)
+    avg_duration = int(sum(recent_durations) / len(recent_durations)) if recent_durations else 0
+    duration_ok = True
+    if avg_duration > 0:
+        duration_ok = run_duration_s <= int(avg_duration * 1.2)
+
+    summaries_with_signal_rate = 0.0
+    if current_run_stats.get("with_summaries"):
+        summaries_with_signal_rate = round(
+            (current_run_stats.get("with_any_signal", 0) / current_run_stats["with_summaries"]) * 100,
+            2,
+        )
+
+    provenance_ok = False
+    for t in flagged:
+        for summary in t.get("attachment_summaries") or []:
+            if not isinstance(summary, dict):
+                continue
+            if summary.get("source_sections"):
+                provenance_ok = True
+                break
+            structured = summary.get("structured_summary")
+            if structured and isinstance(structured, dict):
+                for items in structured.values():
+                    if items:
+                        provenance_ok = True
+                        break
+            if provenance_ok:
+                break
+        if provenance_ok:
+            break
+
+    acceptance = {
+        "coverage_target_75": current_run_stats["rates"].get("any_signal", 0) >= 75.0,
+        "summary_signal_target_60": summaries_with_signal_rate >= 60.0,
+        "provenance_present": provenance_ok,
+        "duration_within_20pct": duration_ok,
+        "false_positive_under_10": baseline_stats.get("low_signal_rate", 0) <= 10.0,
+        "run_duration_s": run_duration_s,
+        "avg_duration_s": avg_duration,
+        "summaries_with_signal_rate": summaries_with_signal_rate,
+    }
+    coverage_report["acceptance"] = acceptance
+
+    if logger:
+        logger.info(
+            "Acceptance checks: coverage>=75=%s summaries>=60=%s provenance=%s duration<=20%%=%s false_pos<=10=%s",
+            acceptance["coverage_target_75"],
+            acceptance["summary_signal_target_60"],
+            acceptance["provenance_present"],
+            acceptance["duration_within_20pct"],
+            acceptance["false_positive_under_10"],
+        )
+
+    coverage_path = (
+        paths.exports_dir / f"attachment_coverage_{_now_local(tz_name):%Y%m%d_%H%M%S}.json"
+    )
+    try:
+        coverage_path.parent.mkdir(parents=True, exist_ok=True)
+        coverage_path.write_text(json.dumps(coverage_report, indent=2), encoding="utf-8")
+        logger.info("Attachment coverage report: %s", coverage_path)
+    except Exception:
+        logger.exception("Attachment coverage report write failed")
+
     if args.dry_run:
         html_path = paths.exports_dir / f"digest_{_now_local(tz_name):%Y%m%d_%H%M%S}.html"
         html = render_digest_html(
@@ -763,6 +1187,8 @@ def main() -> int:
             watchlist=watchlist,
             upcoming=upcoming,
             attachment_coverage=attachment_coverage,
+            attachment_notes=attachment_notes,
+            attachment_structured=attachment_structured,
         )
         html_path.parent.mkdir(parents=True, exist_ok=True)
         html_path.write_text(html, encoding="utf-8")
@@ -780,6 +1206,8 @@ def main() -> int:
                     watchlist=watchlist,
                     upcoming=upcoming,
                     attachment_coverage=attachment_coverage,
+                    attachment_notes=attachment_notes,
+                    attachment_structured=attachment_structured,
                     notifications=settings.notifications,
                 )
                 logger.info("Email sent: %s tenders", len(flagged_top))

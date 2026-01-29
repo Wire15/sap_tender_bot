@@ -16,20 +16,220 @@ EVENT_LABELS = {
     "new_attachment": "New attachment",
 }
 
+_SUBMISSION_REQ_TERMS = {
+    "submission",
+    "submit",
+    "bid",
+    "response format",
+    "proposal format",
+    "file size",
+    "portal",
+    "email",
+    "deadline",
+    "due date",
+    "closing date",
+    "must be submitted",
+    "submit via",
+    "submit by",
+    "response must",
+    "proposal must",
+}
+
+_TECHNICAL_REQ_TERMS = {
+    "integration",
+    "api",
+    "interface",
+    "architecture",
+    "data",
+    "database",
+    "security",
+    "performance",
+    "availability",
+    "scalability",
+    "cloud",
+    "migration",
+    "modernization",
+    "modernisation",
+    "implementation",
+    "deployment",
+    "testing",
+    "monitoring",
+    "analytics",
+    "reporting",
+    "governance",
+    "compliance",
+    "privacy",
+    "backup",
+    "disaster recovery",
+    "resilience",
+    "encryption",
+    "authentication",
+    "authorization",
+    "identity",
+    "access",
+    "network",
+    "hosting",
+    "storage",
+    "etl",
+    "integration platform",
+    "sensing",
+    "risk",
+    "mapping",
+    "modernization plan",
+}
+
+_STAFFING_REQ_TERMS = {
+    "level",
+    "resource",
+    "resources",
+    "consultant",
+    "consultants",
+    "specialist",
+    "analyst",
+    "architect",
+    "project manager",
+    "project executive",
+    "developer",
+    "engineer",
+    "tbips",
+    "spict",
+}
+
+_SUBMISSION_BLOCKLIST_TERMS = {
+    "level",
+    "resource",
+    "resources",
+    "analyst",
+    "architect",
+    "project manager",
+    "project executive",
+    "tbips",
+    "spict",
+}
+
+_SAP_SIGNAL_TERMS = {
+    "sap",
+    "s/4",
+    "s4",
+    "s/4hana",
+    "hana",
+    "ecc",
+    "erp",
+    "ariba",
+    "successfactors",
+}
+
+
+def _has_sap_signal(t) -> bool:
+    parts = [t.get("title", ""), t.get("org", ""), t.get("rationale", "")]
+    llm = t.get("llm") or {}
+    parts.append(llm.get("summary", ""))
+    for req in t.get("attachment_requirements") or []:
+        if isinstance(req, dict):
+            parts.append(req.get("requirement", ""))
+        else:
+            parts.append(str(req))
+    for summary in t.get("attachment_summaries") or []:
+        if isinstance(summary, dict):
+            parts.extend(summary.get("summary", {}).get("requirements", []))
+    text = " ".join(str(p) for p in parts if p).lower()
+    if any(term in text for term in _SAP_SIGNAL_TERMS):
+        return True
+    bucket = str(t.get("semantic_bucket") or "").lower()
+    return bucket in {"erp modernization", "procurement", "hr/payroll", "integration/data", "ams"}
+
+
+def _attachment_note_lines(t):
+    lines = []
+    for summary in t.get("attachment_summaries") or []:
+        if not isinstance(summary, dict):
+            continue
+        name = summary.get("attachment_name") or "Attachment"
+        payload = summary.get("summary") or {}
+        reqs = payload.get("requirements") or []
+        dates = payload.get("dates") or []
+        parts = []
+        if reqs:
+            parts.append("Reqs: " + ", ".join(str(r) for r in reqs[:2]))
+        if dates:
+            parts.append("Dates: " + ", ".join(str(d) for d in dates[:2]))
+        if parts:
+            line = f"{name}: " + " | ".join(parts)
+            if len(line) > 200:
+                line = (line[:200].rsplit(" ", 1)[0].strip()) or line[:200]
+            lines.append(line)
+        if len(lines) >= 2:
+            break
+    return lines
+
+
 def _llm_bullets(t):
     llm = t.get("llm") or {}
     bullets = []
     summary = llm.get("summary") or ""
     if summary:
         bullets.append(f"Brief: {summary}")
+    signal = _attachment_signal(t)
+    if signal:
+        bullets.append(signal)
+    for line in _attachment_note_lines(t):
+        bullets.append(line)
+    if _has_sap_signal(t):
+        bullets.append("Why it matters: SAP/ERP signal found.")
     attachment_reqs = t.get("attachment_requirements") or []
-    for req in attachment_reqs[:3]:
+    submission_reqs = []
+    technical_reqs = []
+    staffing_reqs = []
+    for req in attachment_reqs:
         text = req.get("requirement") if isinstance(req, dict) else str(req)
-        if text:
-            bullets.append(f"Req (doc): {text}")
-    for b in llm.get("key_requirements", [])[:3]:
-        if b:
-            bullets.append(f"Requirement: {b}")
+        if not text:
+            continue
+        lower = text.lower()
+        if any(term in lower for term in _STAFFING_REQ_TERMS):
+            # drop staffing-like requirements from the digest entirely
+            staffing_reqs.append(text)
+            continue
+        if any(term in lower for term in _SUBMISSION_BLOCKLIST_TERMS):
+            # prevent role-level items from being labeled as submission
+            continue
+        is_submission = any(term in lower for term in _SUBMISSION_REQ_TERMS)
+        is_technical = any(term in lower for term in _TECHNICAL_REQ_TERMS)
+        is_staffing = any(term in lower for term in _STAFFING_REQ_TERMS)
+        if is_technical and not is_submission:
+            technical_reqs.append(text)
+        elif is_submission and not is_technical:
+            submission_reqs.append(text)
+        else:
+            # Ambiguous: prefer technical if it contains any tech term.
+            if is_technical:
+                technical_reqs.append(text)
+            elif is_staffing:
+                staffing_reqs.append(text)
+            else:
+                # default to technical unless it explicitly looks like submission
+                if is_submission:
+                    submission_reqs.append(text)
+                else:
+                    technical_reqs.append(text)
+    # De-dup while preserving order.
+    submission_reqs = list(dict.fromkeys(submission_reqs))
+    technical_reqs = list(dict.fromkeys(technical_reqs))
+    staffing_reqs = list(dict.fromkeys(staffing_reqs))
+    for text in submission_reqs[:1]:
+        bullets.append(f"Req (submission): {text}")
+    for text in technical_reqs[:2]:
+        bullets.append(f"Req (technical): {text}")
+    # Staffing requirements are intentionally omitted from the digest.
+    if t.get("attachment_summary_used") and not attachment_reqs:
+        for summary in t.get("attachment_summaries") or []:
+            memo = summary.get("memo") if isinstance(summary, dict) else ""
+            if memo:
+                bullets.append(memo)
+                break
+    if not t.get("attachment_summary_used"):
+        for b in llm.get("key_requirements", [])[:3]:
+            if b:
+                bullets.append(f"Requirement: {b}")
     for b in llm.get("competitive_signals", [])[:2]:
         if b:
             bullets.append(f"Competitive: {b}")
@@ -37,6 +237,41 @@ def _llm_bullets(t):
     if next_step:
         bullets.append(f"Next step: {next_step}")
     return bullets
+
+
+def _attachment_signal(t) -> str:
+    summaries = t.get("attachment_summaries") or []
+    requirements = t.get("attachment_requirements") or []
+    if not summaries and not requirements:
+        return ""
+    attachment_names = set()
+    for summary in summaries:
+        if isinstance(summary, dict) and summary.get("attachment_name"):
+            attachment_names.add(str(summary.get("attachment_name")))
+    if not attachment_names:
+        for req in requirements:
+            if isinstance(req, dict) and req.get("attachment_name"):
+                attachment_names.add(str(req.get("attachment_name")))
+
+    dates_found = False
+    risks_found = False
+    for summary in summaries:
+        if not isinstance(summary, dict):
+            continue
+        payload = summary.get("summary") or {}
+        if payload.get("dates"):
+            dates_found = True
+        if payload.get("key_risks"):
+            risks_found = True
+
+    attachment_count = len(attachment_names) if attachment_names else len(summaries)
+    req_count = len(requirements)
+    dates_flag = "yes" if dates_found else "no"
+    risks_flag = "yes" if risks_found else "no"
+    return (
+        "Attachment signal: "
+        f"{attachment_count} attachments, reqs={req_count}, dates={dates_flag}, risks={risks_flag}"
+    )
 
 
 def _rationale_bullets(t):
@@ -185,6 +420,8 @@ def render_digest_html(
     watchlist=None,
     upcoming=None,
     attachment_coverage=None,
+    attachment_notes=None,
+    attachment_structured=None,
 ):
     new_rows = _render_flagged_rows(new_items or [], include_events=False)
     updated_rows = _render_flagged_rows(updated_items or [], include_events=True)
@@ -268,6 +505,97 @@ def render_digest_html(
         </table>
         """.format(rows=upcoming_rows)
 
+    attachment_notes = attachment_notes or []
+    notes_section = ""
+    if attachment_notes:
+        rows = []
+        for note in attachment_notes[:15]:
+            title = _esc(note.get("title", "Untitled"))
+            org = _esc(note.get("org", "Unknown org"))
+            url = _esc(note.get("url", ""))
+            memo = _esc(note.get("memo", ""))
+            if not memo:
+                continue
+            rows.append(
+                """
+            <tr>
+              <td>
+                <a href="{url}">{title}</a><br>
+                <small>{org}</small>
+              </td>
+              <td>{memo}</td>
+            </tr>
+            """.format(title=title, url=url, org=org, memo=memo)
+            )
+        if rows:
+            notes_section = """
+        <h3>Attachment notes</h3>
+        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse;">
+          <thead>
+            <tr>
+              <th>Tender</th>
+              <th>Note</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows}
+          </tbody>
+        </table>
+        """.format(rows="".join(rows))
+
+    attachment_structured = attachment_structured or []
+    structured_section = ""
+    if attachment_structured:
+        rows = []
+        for item in attachment_structured[:30]:
+            title = _esc(item.get("title", "Untitled"))
+            org = _esc(item.get("org", "Unknown org"))
+            url = _esc(item.get("url", ""))
+            attachment_name = _esc(item.get("attachment_name", "Attachment"))
+            category = _esc(item.get("category", ""))
+            text = _esc(item.get("text", ""))
+            provenance = _esc(item.get("provenance", ""))
+            if not text:
+                continue
+            rows.append(
+                """
+            <tr>
+              <td>
+                <a href="{url}">{title}</a><br>
+                <small>{org}</small>
+              </td>
+              <td>{attachment_name}</td>
+              <td>{category}</td>
+              <td>{text}<br><small>{provenance}</small></td>
+            </tr>
+            """.format(
+                    title=title,
+                    url=url,
+                    org=org,
+                    attachment_name=attachment_name,
+                    category=category,
+                    text=text,
+                    provenance=provenance,
+                )
+            )
+        if rows:
+            structured_section = """
+        <h3>Attachment structured summary</h3>
+        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse;">
+          <thead>
+            <tr>
+              <th>Tender</th>
+              <th>Attachment</th>
+              <th>Category</th>
+              <th>Item</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows}
+          </tbody>
+        </table>
+        """.format(rows="".join(rows))
+
     today = datetime.now().strftime("%Y-%m-%d")
     csv_note = f"<p>CSV exported to: <code>{_esc(csv_path)}</code></p>" if csv_path else ""
     total_top = len(new_items or []) + len(updated_items or [])
@@ -286,6 +614,8 @@ def render_digest_html(
         <p>High-confidence items: <b>{top_count}</b> (of {all_count})</p>
         {coverage_note}
         {csv_note}
+        {notes_section}
+        {structured_section}
         {new_section}
         {updated_section}
         {upcoming_section}
@@ -298,6 +628,8 @@ def render_digest_html(
         all_count=len(all_flagged),
         coverage_note=coverage_note,
         csv_note=csv_note,
+        notes_section=notes_section,
+        structured_section=structured_section,
         new_section=new_section,
         updated_section=updated_section,
         watch_section=watch_section,
@@ -323,6 +655,8 @@ def send_digest_email(
     watchlist=None,
     upcoming=None,
     attachment_coverage=None,
+    attachment_notes=None,
+    attachment_structured=None,
     notifications: NotificationsConfig | None = None,
 ):
     if notifications is None:
@@ -354,6 +688,8 @@ def send_digest_email(
         watchlist=watchlist,
         upcoming=upcoming,
         attachment_coverage=attachment_coverage,
+        attachment_notes=attachment_notes,
+        attachment_structured=attachment_structured,
     )
     msg.attach(MIMEText(html, "html"))
 

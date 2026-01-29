@@ -8,6 +8,20 @@ Federal CanadaBuys -> high-precision SAP/ERP opportunity detection -> pursuit-re
 Non-goals for v1.0:
 - "All Canadian public sector" coverage. Multi-source is a v1.1/v1.2 story unless bandwidth changes.
 
+## Implementation summary (v0.5–v0.6 attachment upgrades)
+High-level summary of what has been implemented in this iteration:
+- **Attachment extraction coverage:** PDF/DOCX/TXT/ZIP + spreadsheets (.xlsx/.xls) with caps; DOCX tables extracted with row/col limits; repeated boilerplate lines removed.
+- **Chunked retrieval:** heading-based chunking with fallback, embeddings + keyword boosting, per-attachment/tender/run caps, and provenance on selected chunks; retrieval feeds the LLM excerpt path.
+- **Structured summaries:** optional structured schema (submission/evaluation/scope/deliverables/schedule/risks/compliance) with citations; validation + dedupe + evidence checks.
+- **Quality filters:** low-signal suppression, evidence-span checks, boilerplate de-duplication, and cross-attachment requirement de-duplication.
+- **Language handling:** French detection and prompt routing with English fallback; language captured on attachment summaries.
+- **Safety & redaction:** PII scrub on excerpt and summary outputs (emails/phones), preserving dates.
+- **Digest improvements:** attachment memo provenance + attachment signal line; attachment notes include top reqs/dates + "why it matters" SAP/ERP signal + truncation.
+- **Persistence:** structured summaries + provenance stored in `attachment_cache` (new columns + migration).
+- **Coverage metrics & reporting:** 30-day baseline metrics, weekly deltas, acceptance checks, and JSON coverage reports in `data/exports/`; UI surface in Attachments page.
+- **Rollback controls:** feature flags for spreadsheets/tables/chunking + attachment LLM kill-switch; README ops notes.
+- **Tests:** extraction fixtures for PDF/DOCX/XLSX, DOCX table regression tests, chunking selection, language detection, cache invalidation, redaction, and caps.
+
 ## Roadmap to v1.0
 Version tiers turn the 1.0 plan into staged, shippable slices. Each tier should be release-ready.
 
@@ -89,6 +103,7 @@ Track per run and roll up weekly:
 - Time to digest: total run minutes (target <= 15 min by v0.6).
 - Cost per run: embeddings + LLM + attachments (target <= $10 by v0.6).
 - Failure rate: failed runs / total runs (target <= 2% by v0.8).
+Coverage tracking uses a rolling 30-day window and writes `attachment_coverage_*.json` reports to `data/exports/`.
 
 ## Second pair of eyes: improvements vs the last plan
 - Add an evaluation dataset and a precision metric target early (before v0.4) to validate ranking changes.
@@ -198,6 +213,15 @@ Notes:
 - **Safety:** MIME validation, size limits, and optional PII scrub before LLM.
 - **Runtime override:** disable per run with `sap-tender-digest --no-attachments`.
 
+### Attachment limits + feature flags
+Key guardrails and knobs (YAML + env overrides):
+- **Caps:** `attachments.max_attachments_per_run`, `attachments.max_attachments_per_tender`, `attachments.max_bytes`
+- **Spreadsheets:** `attachments.spreadsheets_enabled`, `attachments.spreadsheet_max_bytes`, `attachments.spreadsheet_max_rows`, `attachments.spreadsheet_max_cols`, `attachments.spreadsheet_max_sheets`, `attachments.spreadsheet_sheet_char_budget`
+- **DOCX tables:** `attachments.docx_tables_enabled`, `attachments.docx_table_max_tables`, `attachments.docx_table_max_rows`, `attachments.docx_table_max_cols`, `attachments.docx_table_char_budget`
+- **Chunking (future):** `attachments.chunked_retrieval_enabled`, `attachments.chunk_text_max_chars`, `attachments.chunk_text_overlap`, `attachments.chunk_char_budget`, `attachments.chunk_max_per_attachment`, `attachments.chunk_max_per_tender`, `attachments.chunk_max_per_run`
+- **Structured summaries (future):** `attachments.structured_summaries_enabled`
+- **Language routing (future):** `attachments.language_detection_enabled`, `attachments.language_default`
+
 ## Attachment Q&A (planned steps)
 High-level steps to add a tender Q&A experience backed by attachment text (with citations):
 1) **Persist normalized attachment text**  
@@ -242,6 +266,31 @@ Optional overrides:
 - `SAP_TENDER_INCLUDE_STAFFING`, `SAP_TENDER_INCLUDE_SUPPLY_ARRANGEMENTS`
 - `SAP_TENDER_SEEN_RETENTION_DAYS`, `SAP_TENDER_WATCHLIST_MAX`, `SAP_TENDER_WATCHLIST_BLOCKLIST`
 - `SAP_TENDER_DIGEST_SCHEDULE`, `SAP_TENDER_TIMEZONE`
+- `SAP_TENDER_ATTACHMENTS_ENABLED`, `SAP_TENDER_ATTACHMENTS_PER_RUN_MAX`, `SAP_TENDER_ATTACHMENTS_PER_TENDER_MAX`
+- `SAP_TENDER_ATTACHMENTS_MAX_BYTES`, `SAP_TENDER_ATTACHMENTS_TIMEOUT_S`
+- `SAP_TENDER_ATTACHMENTS_DOWNLOAD_RETRIES`, `SAP_TENDER_ATTACHMENTS_DOWNLOAD_CONCURRENCY`
+- `SAP_TENDER_ATTACHMENTS_SECTION_CHAR_BUDGET`, `SAP_TENDER_ATTACHMENTS_MAX_SECTIONS`
+- `SAP_TENDER_ATTACHMENTS_MIN_TEXT_CHARS_FOR_OCR`, `SAP_TENDER_ATTACHMENTS_OCR_ENABLED`
+- `SAP_TENDER_ATTACHMENTS_PII_SCRUB`
+- `SAP_TENDER_ATTACHMENTS_SPREADSHEETS_ENABLED`, `SAP_TENDER_ATTACHMENTS_SPREADSHEET_MAX_BYTES`
+- `SAP_TENDER_ATTACHMENTS_SPREADSHEET_MAX_ROWS`, `SAP_TENDER_ATTACHMENTS_SPREADSHEET_MAX_COLS`
+- `SAP_TENDER_ATTACHMENTS_SPREADSHEET_MAX_SHEETS`, `SAP_TENDER_ATTACHMENTS_SPREADSHEET_SHEET_CHAR_BUDGET`
+- `SAP_TENDER_ATTACHMENTS_DOCX_TABLES_ENABLED`, `SAP_TENDER_ATTACHMENTS_DOCX_TABLE_MAX_TABLES`
+- `SAP_TENDER_ATTACHMENTS_DOCX_TABLE_MAX_ROWS`
+- `SAP_TENDER_ATTACHMENTS_DOCX_TABLE_MAX_COLS`, `SAP_TENDER_ATTACHMENTS_DOCX_TABLE_CHAR_BUDGET`
+- `SAP_TENDER_ATTACHMENTS_CHUNKED_RETRIEVAL_ENABLED`, `SAP_TENDER_ATTACHMENTS_CHUNK_TEXT_MAX_CHARS`
+- `SAP_TENDER_ATTACHMENTS_CHUNK_TEXT_OVERLAP`, `SAP_TENDER_ATTACHMENTS_CHUNK_CHAR_BUDGET`
+- `SAP_TENDER_ATTACHMENTS_CHUNK_MAX_PER_ATTACHMENT`, `SAP_TENDER_ATTACHMENTS_CHUNK_MAX_PER_TENDER`
+- `SAP_TENDER_ATTACHMENTS_CHUNK_MAX_PER_RUN`
+- `SAP_TENDER_ATTACHMENTS_STRUCTURED_SUMMARIES_ENABLED`
+- `SAP_TENDER_ATTACHMENTS_LANGUAGE_DETECTION_ENABLED`, `SAP_TENDER_ATTACHMENTS_LANGUAGE_DEFAULT`
+- `SAP_TENDER_ATTACHMENTS_LLM_ENABLED`, `SAP_TENDER_ATTACHMENTS_LLM_KILL_SWITCH`
+
+## Rollback (ops)
+If attachment costs spike or parsing misbehaves, disable features via config/env:
+- Disable attachment LLM: set `SAP_TENDER_ATTACHMENTS_LLM_KILL_SWITCH=1` (or `attachments.llm_kill_switch: true`)
+- Disable attachments entirely: set `SAP_TENDER_ATTACHMENTS_ENABLED=0`
+- Disable specific extractors: `SAP_TENDER_ATTACHMENTS_SPREADSHEETS_ENABLED=0`, `SAP_TENDER_ATTACHMENTS_DOCX_TABLES_ENABLED=0`, `SAP_TENDER_ATTACHMENTS_CHUNKED_RETRIEVAL_ENABLED=0`
 
 ## State and outputs
 - State: `data/sap_tender.db` (tables: runs, tenders, decisions, feedback)

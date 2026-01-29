@@ -253,12 +253,35 @@ class AttachmentsConfig:
     min_text_chars_for_ocr: int = 800
     ocr_enabled: bool = False
     pii_scrub: bool = False
+    spreadsheets_enabled: bool = True
+    spreadsheet_max_bytes: int = 8_000_000
+    spreadsheet_max_rows: int = 2000
+    spreadsheet_max_cols: int = 40
+    spreadsheet_max_sheets: int = 5
+    spreadsheet_sheet_char_budget: int = 2000
+    docx_tables_enabled: bool = True
+    docx_table_max_tables: int = 6
+    docx_table_max_rows: int = 200
+    docx_table_max_cols: int = 20
+    docx_table_char_budget: int = 3000
+    chunked_retrieval_enabled: bool = False
+    chunk_text_max_chars: int = 1200
+    chunk_text_overlap: int = 100
+    chunk_char_budget: int = 3200
+    chunk_max_per_attachment: int = 6
+    chunk_max_per_tender: int = 18
+    chunk_max_per_run: int = 60
+    structured_summaries_enabled: bool = False
+    language_detection_enabled: bool = False
+    language_default: str = "en"
     llm_enabled: bool = True
-    llm_model: str = "command-r"
+    llm_kill_switch: bool = False
+    llm_model: str = "command-a-03-2025"
     llm_api_key: str = ""
     llm_api_base: str = "https://api.cohere.com"
     llm_timeout_s: int = 45
     llm_per_run_max: int = 20
+    llm_concurrency: int = 2
     llm_daily_cap: int = 0
 
     def to_dict(self) -> dict:
@@ -275,12 +298,35 @@ class AttachmentsConfig:
             "min_text_chars_for_ocr": self.min_text_chars_for_ocr,
             "ocr_enabled": self.ocr_enabled,
             "pii_scrub": self.pii_scrub,
+            "spreadsheets_enabled": self.spreadsheets_enabled,
+            "spreadsheet_max_bytes": self.spreadsheet_max_bytes,
+            "spreadsheet_max_rows": self.spreadsheet_max_rows,
+            "spreadsheet_max_cols": self.spreadsheet_max_cols,
+            "spreadsheet_max_sheets": self.spreadsheet_max_sheets,
+            "spreadsheet_sheet_char_budget": self.spreadsheet_sheet_char_budget,
+            "docx_tables_enabled": self.docx_tables_enabled,
+            "docx_table_max_tables": self.docx_table_max_tables,
+            "docx_table_max_rows": self.docx_table_max_rows,
+            "docx_table_max_cols": self.docx_table_max_cols,
+            "docx_table_char_budget": self.docx_table_char_budget,
+            "chunked_retrieval_enabled": self.chunked_retrieval_enabled,
+            "chunk_text_max_chars": self.chunk_text_max_chars,
+            "chunk_text_overlap": self.chunk_text_overlap,
+            "chunk_char_budget": self.chunk_char_budget,
+            "chunk_max_per_attachment": self.chunk_max_per_attachment,
+            "chunk_max_per_tender": self.chunk_max_per_tender,
+            "chunk_max_per_run": self.chunk_max_per_run,
+            "structured_summaries_enabled": self.structured_summaries_enabled,
+            "language_detection_enabled": self.language_detection_enabled,
+            "language_default": self.language_default,
             "llm_enabled": self.llm_enabled,
+            "llm_kill_switch": self.llm_kill_switch,
             "llm_model": self.llm_model,
             "llm_api_key": self.llm_api_key,
             "llm_api_base": self.llm_api_base,
             "llm_timeout_s": self.llm_timeout_s,
             "llm_per_run_max": self.llm_per_run_max,
+            "llm_concurrency": self.llm_concurrency,
             "llm_daily_cap": self.llm_daily_cap,
         }
 
@@ -429,12 +475,45 @@ def config_from_dict(repo_root: Path, data: dict) -> AppConfig:
             min_text_chars_for_ocr=int(attachments_data.get("min_text_chars_for_ocr", 800)),
             ocr_enabled=bool(attachments_data.get("ocr_enabled", False)),
             pii_scrub=bool(attachments_data.get("pii_scrub", False)),
+            spreadsheets_enabled=bool(attachments_data.get("spreadsheets_enabled", True)),
+            spreadsheet_max_bytes=int(attachments_data.get("spreadsheet_max_bytes", 8_000_000)),
+            spreadsheet_max_rows=int(attachments_data.get("spreadsheet_max_rows", 2000)),
+            spreadsheet_max_cols=int(attachments_data.get("spreadsheet_max_cols", 40)),
+            spreadsheet_max_sheets=int(attachments_data.get("spreadsheet_max_sheets", 5)),
+            spreadsheet_sheet_char_budget=int(
+                attachments_data.get("spreadsheet_sheet_char_budget", 2000)
+            ),
+            docx_tables_enabled=bool(attachments_data.get("docx_tables_enabled", True)),
+            docx_table_max_tables=int(attachments_data.get("docx_table_max_tables", 6)),
+            docx_table_max_rows=int(attachments_data.get("docx_table_max_rows", 200)),
+            docx_table_max_cols=int(attachments_data.get("docx_table_max_cols", 20)),
+            docx_table_char_budget=int(attachments_data.get("docx_table_char_budget", 3000)),
+            chunked_retrieval_enabled=bool(
+                attachments_data.get("chunked_retrieval_enabled", False)
+            ),
+            chunk_text_max_chars=int(attachments_data.get("chunk_text_max_chars", 1200)),
+            chunk_text_overlap=int(attachments_data.get("chunk_text_overlap", 100)),
+            chunk_char_budget=int(attachments_data.get("chunk_char_budget", 3200)),
+            chunk_max_per_attachment=int(
+                attachments_data.get("chunk_max_per_attachment", 6)
+            ),
+            chunk_max_per_tender=int(attachments_data.get("chunk_max_per_tender", 18)),
+            chunk_max_per_run=int(attachments_data.get("chunk_max_per_run", 60)),
+            structured_summaries_enabled=bool(
+                attachments_data.get("structured_summaries_enabled", False)
+            ),
+            language_detection_enabled=bool(
+                attachments_data.get("language_detection_enabled", False)
+            ),
+            language_default=str(attachments_data.get("language_default", "en")),
             llm_enabled=bool(attachments_data.get("llm_enabled", True)),
+            llm_kill_switch=bool(attachments_data.get("llm_kill_switch", False)),
             llm_model=str(attachments_data.get("llm_model", "command-r")),
             llm_api_key=str(attachments_data.get("llm_api_key", "")),
             llm_api_base=str(attachments_data.get("llm_api_base", "https://api.cohere.ai")),
             llm_timeout_s=int(attachments_data.get("llm_timeout_s", 45)),
             llm_per_run_max=int(attachments_data.get("llm_per_run_max", 20)),
+            llm_concurrency=int(attachments_data.get("llm_concurrency", 2)),
             llm_daily_cap=int(attachments_data.get("llm_daily_cap", 0)),
         ),
         sources=list(sources_data) if isinstance(sources_data, list) else list(DEFAULT_SOURCES),
@@ -657,9 +736,97 @@ def apply_env_overrides(config: AppConfig) -> AppConfig:
         os.getenv("SAP_TENDER_ATTACHMENTS_PII_SCRUB"),
         config.attachments.pii_scrub,
     )
+    config.attachments.spreadsheets_enabled = _bool_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_SPREADSHEETS_ENABLED"),
+        config.attachments.spreadsheets_enabled,
+    )
+    config.attachments.spreadsheet_max_bytes = _int_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_SPREADSHEET_MAX_BYTES"),
+        config.attachments.spreadsheet_max_bytes,
+    )
+    config.attachments.spreadsheet_max_rows = _int_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_SPREADSHEET_MAX_ROWS"),
+        config.attachments.spreadsheet_max_rows,
+    )
+    config.attachments.spreadsheet_max_cols = _int_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_SPREADSHEET_MAX_COLS"),
+        config.attachments.spreadsheet_max_cols,
+    )
+    config.attachments.spreadsheet_max_sheets = _int_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_SPREADSHEET_MAX_SHEETS"),
+        config.attachments.spreadsheet_max_sheets,
+    )
+    config.attachments.spreadsheet_sheet_char_budget = _int_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_SPREADSHEET_SHEET_CHAR_BUDGET"),
+        config.attachments.spreadsheet_sheet_char_budget,
+    )
+    config.attachments.docx_tables_enabled = _bool_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_DOCX_TABLES_ENABLED"),
+        config.attachments.docx_tables_enabled,
+    )
+    config.attachments.docx_table_max_tables = _int_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_DOCX_TABLE_MAX_TABLES"),
+        config.attachments.docx_table_max_tables,
+    )
+    config.attachments.docx_table_max_rows = _int_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_DOCX_TABLE_MAX_ROWS"),
+        config.attachments.docx_table_max_rows,
+    )
+    config.attachments.docx_table_max_cols = _int_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_DOCX_TABLE_MAX_COLS"),
+        config.attachments.docx_table_max_cols,
+    )
+    config.attachments.docx_table_char_budget = _int_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_DOCX_TABLE_CHAR_BUDGET"),
+        config.attachments.docx_table_char_budget,
+    )
+    config.attachments.chunked_retrieval_enabled = _bool_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_CHUNKED_RETRIEVAL_ENABLED"),
+        config.attachments.chunked_retrieval_enabled,
+    )
+    config.attachments.chunk_text_max_chars = _int_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_CHUNK_TEXT_MAX_CHARS"),
+        config.attachments.chunk_text_max_chars,
+    )
+    config.attachments.chunk_text_overlap = _int_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_CHUNK_TEXT_OVERLAP"),
+        config.attachments.chunk_text_overlap,
+    )
+    config.attachments.chunk_char_budget = _int_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_CHUNK_CHAR_BUDGET"),
+        config.attachments.chunk_char_budget,
+    )
+    config.attachments.chunk_max_per_attachment = _int_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_CHUNK_MAX_PER_ATTACHMENT"),
+        config.attachments.chunk_max_per_attachment,
+    )
+    config.attachments.chunk_max_per_tender = _int_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_CHUNK_MAX_PER_TENDER"),
+        config.attachments.chunk_max_per_tender,
+    )
+    config.attachments.chunk_max_per_run = _int_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_CHUNK_MAX_PER_RUN"),
+        config.attachments.chunk_max_per_run,
+    )
+    config.attachments.structured_summaries_enabled = _bool_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_STRUCTURED_SUMMARIES_ENABLED"),
+        config.attachments.structured_summaries_enabled,
+    )
+    config.attachments.language_detection_enabled = _bool_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_LANGUAGE_DETECTION_ENABLED"),
+        config.attachments.language_detection_enabled,
+    )
+    config.attachments.language_default = os.getenv(
+        "SAP_TENDER_ATTACHMENTS_LANGUAGE_DEFAULT",
+        config.attachments.language_default,
+    )
     config.attachments.llm_enabled = _bool_from_env(
         os.getenv("SAP_TENDER_ATTACHMENTS_LLM_ENABLED"),
         config.attachments.llm_enabled,
+    )
+    config.attachments.llm_kill_switch = _bool_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_LLM_KILL_SWITCH"),
+        config.attachments.llm_kill_switch,
     )
     config.attachments.llm_model = os.getenv(
         "SAP_TENDER_ATTACHMENTS_LLM_MODEL",
@@ -681,10 +848,17 @@ def apply_env_overrides(config: AppConfig) -> AppConfig:
         os.getenv("SAP_TENDER_ATTACHMENTS_LLM_PER_RUN_MAX"),
         config.attachments.llm_per_run_max,
     )
+    config.attachments.llm_concurrency = _int_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_LLM_CONCURRENCY"),
+        config.attachments.llm_concurrency,
+    )
     config.attachments.llm_daily_cap = _int_from_env(
         os.getenv("SAP_TENDER_ATTACHMENTS_LLM_DAILY_CAP"),
         config.attachments.llm_daily_cap,
     )
+
+    if config.attachments.llm_kill_switch:
+        config.attachments.llm_enabled = False
 
     if not config.attachments.llm_api_key:
         config.attachments.llm_api_key = config.llm.api_key

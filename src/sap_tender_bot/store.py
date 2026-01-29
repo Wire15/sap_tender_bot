@@ -113,6 +113,14 @@ MIGRATIONS: list[tuple[int, str]] = [
             ON attachment_cache(url_norm, content_hash);
         """,
     ),
+    (
+        3,
+        """
+        ALTER TABLE attachment_cache ADD COLUMN structured_summary_json TEXT;
+        ALTER TABLE attachment_cache ADD COLUMN source_sections_json TEXT;
+        ALTER TABLE attachment_cache ADD COLUMN selected_chunks_json TEXT;
+        """,
+    ),
 ]
 
 
@@ -349,6 +357,57 @@ class TenderStore:
         )
         self.conn.commit()
 
+    def fetch_tender_payloads_between(
+        self, *, start_iso: str, end_iso: str
+    ) -> list[dict]:
+        if not self.conn:
+            raise RuntimeError("Store is not open")
+        rows = self.conn.execute(
+            """
+            SELECT last_payload
+            FROM tenders
+            WHERE last_seen >= ? AND last_seen <= ?
+            """,
+            (start_iso, end_iso),
+        ).fetchall()
+        payloads: list[dict] = []
+        for row in rows:
+            raw = row["last_payload"] if row else None
+            if not raw:
+                continue
+            try:
+                payloads.append(json.loads(raw))
+            except Exception:
+                continue
+        return payloads
+
+    def fetch_recent_run_durations(self, limit: int = 10) -> list[int]:
+        if not self.conn:
+            raise RuntimeError("Store is not open")
+        rows = self.conn.execute(
+            """
+            SELECT started_at, finished_at
+            FROM runs
+            WHERE status = 'ok' AND finished_at IS NOT NULL
+            ORDER BY finished_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        durations: list[int] = []
+        for row in rows:
+            started = row["started_at"]
+            finished = row["finished_at"]
+            if not started or not finished:
+                continue
+            try:
+                start_dt = datetime.fromisoformat(str(started).replace("Z", "+00:00"))
+                end_dt = datetime.fromisoformat(str(finished).replace("Z", "+00:00"))
+                durations.append(int((end_dt - start_dt).total_seconds()))
+            except Exception:
+                continue
+        return durations
+
     def fetch_attachment_cache_by_meta(
         self,
         *,
@@ -421,15 +480,19 @@ class TenderStore:
             "summary_cached_at": entry.get("summary_cached_at"),
             "requirements_json": entry.get("requirements_json"),
             "summary_model": entry.get("summary_model"),
+            "structured_summary_json": entry.get("structured_summary_json"),
+            "source_sections_json": entry.get("source_sections_json"),
+            "selected_chunks_json": entry.get("selected_chunks_json"),
         }
         self.conn.execute(
             """
             INSERT INTO attachment_cache (
                 fingerprint, url_norm, url, etag, last_modified, content_hash,
                 mime_type, size_bytes, fetched_at, text_path, text_chars,
-                summary_json, summary_cached_at, requirements_json, summary_model
+                summary_json, summary_cached_at, requirements_json, summary_model,
+                structured_summary_json, source_sections_json, selected_chunks_json
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(fingerprint) DO UPDATE SET
                 url_norm = excluded.url_norm,
                 url = excluded.url,
@@ -450,7 +513,19 @@ class TenderStore:
                     excluded.requirements_json,
                     attachment_cache.requirements_json
                 ),
-                summary_model = COALESCE(excluded.summary_model, attachment_cache.summary_model)
+                summary_model = COALESCE(excluded.summary_model, attachment_cache.summary_model),
+                structured_summary_json = COALESCE(
+                    excluded.structured_summary_json,
+                    attachment_cache.structured_summary_json
+                ),
+                source_sections_json = COALESCE(
+                    excluded.source_sections_json,
+                    attachment_cache.source_sections_json
+                ),
+                selected_chunks_json = COALESCE(
+                    excluded.selected_chunks_json,
+                    attachment_cache.selected_chunks_json
+                )
             """,
             (
                 payload["fingerprint"],
@@ -468,6 +543,9 @@ class TenderStore:
                 payload["summary_cached_at"],
                 payload["requirements_json"],
                 payload["summary_model"],
+                payload["structured_summary_json"],
+                payload["source_sections_json"],
+                payload["selected_chunks_json"],
             ),
         )
         self.conn.commit()

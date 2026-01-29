@@ -63,12 +63,35 @@ attachments:
   min_text_chars_for_ocr: 800
   ocr_enabled: false
   pii_scrub: false
+  spreadsheets_enabled: true
+  spreadsheet_max_bytes: 8000000
+  spreadsheet_max_rows: 2000
+  spreadsheet_max_cols: 40
+  spreadsheet_max_sheets: 5
+  spreadsheet_sheet_char_budget: 2000
+  docx_tables_enabled: true
+  docx_table_max_tables: 6
+  docx_table_max_rows: 200
+  docx_table_max_cols: 20
+  docx_table_char_budget: 3000
+  chunked_retrieval_enabled: false
+  chunk_text_max_chars: 1200
+  chunk_text_overlap: 100
+  chunk_char_budget: 3200
+  chunk_max_per_attachment: 6
+  chunk_max_per_tender: 18
+  chunk_max_per_run: 60
+  structured_summaries_enabled: false
+  language_detection_enabled: false
+  language_default: en
   llm_enabled: true
-  llm_model: command-r
+  llm_kill_switch: false
+  llm_model: command-a-03-2025
   llm_api_key: ""
   llm_api_base: https://api.cohere.com
   llm_timeout_s: 45
   llm_per_run_max: 20
+  llm_concurrency: 2
   llm_daily_cap: 0
 sources:
   - name: CanadaBuys CKAN
