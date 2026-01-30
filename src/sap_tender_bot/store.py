@@ -461,6 +461,27 @@ class TenderStore:
         ).fetchone()
         return dict(row) if row else None
 
+    def fetch_attachment_cache_samples(
+        self,
+        *,
+        limit: int = 20,
+        min_text_chars: int = 0,
+    ) -> list[dict]:
+        if not self.conn:
+            raise RuntimeError("Store is not open")
+        rows = self.conn.execute(
+            """
+            SELECT *
+            FROM attachment_cache
+            WHERE text_path IS NOT NULL
+              AND COALESCE(text_chars, 0) >= ?
+            ORDER BY fetched_at DESC
+            LIMIT ?
+            """,
+            (min_text_chars, limit),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
     def upsert_attachment_cache(self, *, entry: dict) -> None:
         if not self.conn:
             raise RuntimeError("Store is not open")

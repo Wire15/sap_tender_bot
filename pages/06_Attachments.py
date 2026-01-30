@@ -2,10 +2,25 @@ from __future__ import annotations
 
 import json
 import random
+import re
 
 import streamlit as st
 
 import ui_common as ui
+
+
+def _sanitize_url(value) -> str:
+    if not value:
+        return ""
+    if isinstance(value, (list, tuple)):
+        value = " ".join(str(v) for v in value if v)
+    text = str(value)
+    if "," in text:
+        text = text.split(",", 1)[0].strip()
+    match = re.search(r"https?://\\S+", text)
+    if match:
+        return match.group(0).rstrip(").,;")
+    return text.split()[0] if text.split() else ""
 
 ui.set_page_config("SAP Tender Admin")
 filters = ui.render_sidebar()
@@ -98,7 +113,7 @@ else:
             continue
         name = summary.get("attachment_name") or summary.get("attachment_url") or f"Attachment {idx}"
         with st.expander(name, expanded=False):
-            url = summary.get("attachment_url")
+            url = _sanitize_url(summary.get("attachment_url"))
             if url:
                 st.markdown(f"[Open attachment]({url})")
             st.caption(

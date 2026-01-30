@@ -38,6 +38,7 @@ llm:
   model: command-a-03-2025
   api_base: https://api.cohere.com
   timeout_s: 45
+  max_requests_per_minute: 20
   borderline_max: 10
   daily_cap: 120
   per_run_max: 40
@@ -57,7 +58,7 @@ attachments:
   max_bytes: 15000000
   timeout_s: 40
   download_retries: 2
-  download_concurrency: 4
+  download_concurrency: 2
   section_char_budget: 4000
   max_sections: 4
   min_text_chars_for_ocr: 800
@@ -81,7 +82,7 @@ attachments:
   chunk_max_per_attachment: 6
   chunk_max_per_tender: 18
   chunk_max_per_run: 60
-  structured_summaries_enabled: false
+  structured_summaries_enabled: true
   language_detection_enabled: false
   language_default: en
   llm_enabled: true
@@ -93,6 +94,8 @@ attachments:
   llm_per_run_max: 20
   llm_concurrency: 2
   llm_daily_cap: 0
+  prompt_version: v2
+  llm_max_requests_per_minute: 20
 sources:
   - name: CanadaBuys CKAN
     enabled: true

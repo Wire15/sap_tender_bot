@@ -1,0 +1,135 @@
+2026-01-30 11:27:02,584 | INFO | Logging to C:\dev\sap-tender-bot\logs\run_20260130.log
+2026-01-30 11:27:02,597 | INFO | Applying DB migration 1
+2026-01-30 11:27:02,628 | INFO | Applying DB migration 2
+2026-01-30 11:27:02,645 | INFO | Applying DB migration 3
+2026-01-30 11:27:02,661 | INFO | No prior run found; consider --bootstrap to seed state.
+2026-01-30 11:27:02,661 | INFO | SQLite store: C:\dev\sap-tender-bot\data\sap_tender.db
+2026-01-30 11:27:02,661 | INFO | Last successful run: None
+2026-01-30 11:27:02,661 | INFO | Fetching CanadaBuys tenders since=None
+2026-01-30 11:27:22,647 | INFO | Reject: exclude_supply_arrangement=278
+2026-01-30 11:27:22,648 | INFO | Reject: exclude_goods_or_hardware=225
+2026-01-30 11:27:22,648 | INFO | Reject: exclude_negative_title=158
+2026-01-30 11:27:22,648 | INFO | Reject: exclude_no_erp_domain=134
+2026-01-30 11:27:22,649 | INFO | Reject: exclude_non_it_unspsc=81
+2026-01-30 11:27:22,649 | INFO | Reject: exclude_award_notice=28
+2026-01-30 11:27:22,649 | INFO | Reject: exclude_no_it_context=1
+2026-01-30 11:27:22,649 | INFO | Reject: exclude_far_future_close=1
+2026-01-30 11:27:22,649 | INFO | Reject: exclude_below_score_threshold=1
+2026-01-30 11:27:22,649 | INFO | Events: new=921 updated=0 candidates=921 flagged=14
+2026-01-30 11:27:22,650 | INFO | LLM: requesting summary for canadabuys:cb-272-99557926:am001
+2026-01-30 11:27:23,292 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 1/4, sleeping 1s)
+2026-01-30 11:27:26,358 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 2/4, sleeping 2s)
+2026-01-30 11:27:29,348 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 3/4, sleeping 3s)
+2026-01-30 11:27:32,722 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 4/4, sleeping 4s)
+2026-01-30 11:27:36,723 | ERROR | LLM: failed for canadabuys:cb-272-99557926:am001; skipping item
+Traceback (most recent call last):
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 874, in enrich_tenders_with_llm
+    result = _cohere_chat(prompt, config=config, logger=logger)
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 796, in _cohere_chat
+    text = _cohere_chat_raw(prompt, config=config, logger=logger)
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 443, in _cohere_chat_raw
+    raise RuntimeError(f"Cohere request failed after retries: {last_err}")
+RuntimeError: Cohere request failed after retries: None
+2026-01-30 11:27:36,729 | INFO | LLM: requesting summary for canadabuys:cb-495-14096276:am000
+2026-01-30 11:27:37,465 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 1/4, sleeping 1s)
+2026-01-30 11:27:40,432 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 2/4, sleeping 2s)
+2026-01-30 11:27:43,452 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 3/4, sleeping 3s)
+2026-01-30 11:27:47,136 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 4/4, sleeping 4s)
+2026-01-30 11:27:51,137 | ERROR | LLM: failed for canadabuys:cb-495-14096276:am000; skipping item
+Traceback (most recent call last):
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 874, in enrich_tenders_with_llm
+    result = _cohere_chat(prompt, config=config, logger=logger)
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 796, in _cohere_chat
+    text = _cohere_chat_raw(prompt, config=config, logger=logger)
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 443, in _cohere_chat_raw
+    raise RuntimeError(f"Cohere request failed after retries: {last_err}")
+RuntimeError: Cohere request failed after retries: None
+2026-01-30 11:27:51,141 | INFO | LLM: requesting summary for canadabuys:cb-848-48753531:am002
+2026-01-30 11:27:51,805 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 1/4, sleeping 1s)
+2026-01-30 11:27:54,828 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 2/4, sleeping 2s)
+2026-01-30 11:27:57,854 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 3/4, sleeping 3s)
+2026-01-30 11:28:01,481 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 4/4, sleeping 4s)
+2026-01-30 11:28:05,482 | ERROR | LLM: failed for canadabuys:cb-848-48753531:am002; skipping item
+Traceback (most recent call last):
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 874, in enrich_tenders_with_llm
+    result = _cohere_chat(prompt, config=config, logger=logger)
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 796, in _cohere_chat
+    text = _cohere_chat_raw(prompt, config=config, logger=logger)
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 443, in _cohere_chat_raw
+    raise RuntimeError(f"Cohere request failed after retries: {last_err}")
+RuntimeError: Cohere request failed after retries: None
+2026-01-30 11:28:05,486 | INFO | LLM: requesting summary for canadabuys:cb-355-38336458:am003
+2026-01-30 11:28:06,186 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 1/4, sleeping 1s)
+2026-01-30 11:28:09,147 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 2/4, sleeping 2s)
+2026-01-30 11:28:12,117 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 3/4, sleeping 3s)
+2026-01-30 11:28:15,684 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 4/4, sleeping 4s)
+2026-01-30 11:28:19,685 | ERROR | LLM: failed for canadabuys:cb-355-38336458:am003; skipping item
+Traceback (most recent call last):
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 874, in enrich_tenders_with_llm
+    result = _cohere_chat(prompt, config=config, logger=logger)
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 796, in _cohere_chat
+    text = _cohere_chat_raw(prompt, config=config, logger=logger)
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 443, in _cohere_chat_raw
+    raise RuntimeError(f"Cohere request failed after retries: {last_err}")
+RuntimeError: Cohere request failed after retries: None
+2026-01-30 11:28:19,688 | INFO | LLM: requesting summary for canadabuys:cb-444-45202448:am000
+2026-01-30 11:28:20,079 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 1/4, sleeping 1s)
+2026-01-30 11:28:23,298 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 2/4, sleeping 2s)
+2026-01-30 11:28:26,329 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 3/4, sleeping 3s)
+2026-01-30 11:28:29,940 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 4/4, sleeping 4s)
+2026-01-30 11:28:33,941 | ERROR | LLM: failed for canadabuys:cb-444-45202448:am000; skipping item
+Traceback (most recent call last):
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 874, in enrich_tenders_with_llm
+    result = _cohere_chat(prompt, config=config, logger=logger)
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 796, in _cohere_chat
+    text = _cohere_chat_raw(prompt, config=config, logger=logger)
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 443, in _cohere_chat_raw
+    raise RuntimeError(f"Cohere request failed after retries: {last_err}")
+RuntimeError: Cohere request failed after retries: None
+2026-01-30 11:28:33,946 | INFO | LLM: requesting summary for canadabuys:cb-845-15654166:am001
+2026-01-30 11:28:34,640 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 1/4, sleeping 1s)
+2026-01-30 11:28:37,590 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 2/4, sleeping 2s)
+2026-01-30 11:28:40,334 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 3/4, sleeping 3s)
+2026-01-30 11:28:43,737 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 4/4, sleeping 4s)
+2026-01-30 11:28:47,738 | ERROR | LLM: failed for canadabuys:cb-845-15654166:am001; skipping item
+Traceback (most recent call last):
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 874, in enrich_tenders_with_llm
+    result = _cohere_chat(prompt, config=config, logger=logger)
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 796, in _cohere_chat
+    text = _cohere_chat_raw(prompt, config=config, logger=logger)
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 443, in _cohere_chat_raw
+    raise RuntimeError(f"Cohere request failed after retries: {last_err}")
+RuntimeError: Cohere request failed after retries: None
+2026-01-30 11:28:47,744 | INFO | LLM: requesting summary for canadabuys:cb-565-60949693:am001
+2026-01-30 11:28:48,129 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 1/4, sleeping 1s)
+2026-01-30 11:28:51,609 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 2/4, sleeping 2s)
+2026-01-30 11:28:54,456 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 3/4, sleeping 3s)
+2026-01-30 11:28:58,142 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 4/4, sleeping 4s)
+2026-01-30 11:29:02,144 | ERROR | LLM: failed for canadabuys:cb-565-60949693:am001; skipping item
+Traceback (most recent call last):
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 874, in enrich_tenders_with_llm
+    result = _cohere_chat(prompt, config=config, logger=logger)
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 796, in _cohere_chat
+    text = _cohere_chat_raw(prompt, config=config, logger=logger)
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 443, in _cohere_chat_raw
+    raise RuntimeError(f"Cohere request failed after retries: {last_err}")
+RuntimeError: Cohere request failed after retries: None
+2026-01-30 11:29:02,149 | INFO | LLM: requesting summary for canadabuys:cb-942-84321058:am000
+2026-01-30 11:29:02,905 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 1/4, sleeping 1s)
+2026-01-30 11:29:05,807 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 2/4, sleeping 2s)
+2026-01-30 11:29:08,831 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 3/4, sleeping 3s)
+2026-01-30 11:29:12,463 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 4/4, sleeping 4s)
+2026-01-30 11:29:16,464 | ERROR | LLM: failed for canadabuys:cb-942-84321058:am000; skipping item
+Traceback (most recent call last):
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 874, in enrich_tenders_with_llm
+    result = _cohere_chat(prompt, config=config, logger=logger)
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 796, in _cohere_chat
+    text = _cohere_chat_raw(prompt, config=config, logger=logger)
+  File "C:\dev\sap-tender-bot\src\sap_tender_bot\pipeline\llm.py", line 443, in _cohere_chat_raw
+    raise RuntimeError(f"Cohere request failed after retries: {last_err}")
+RuntimeError: Cohere request failed after retries: None
+2026-01-30 11:29:16,468 | INFO | LLM: requesting summary for canadabuys:cb-768-1387214:am000
+2026-01-30 11:29:17,175 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 1/4, sleeping 1s)
+2026-01-30 11:29:20,123 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 2/4, sleeping 2s)
+2026-01-30 11:29:23,123 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 3/4, sleeping 3s)
+2026-01-30 11:29:26,616 | WARNING | LLM: retryable HTTP 429 on https://api.cohere.com/v2/chat (attempt 4/4, sleeping 4s)

@@ -11,6 +11,7 @@ from typing import Any, Dict, Iterable, Optional
 import requests
 
 from sap_tender_bot.config import LLMConfig
+from sap_tender_bot.utils.rate_limit import rate_limit_wait
 
 DEFAULT_SCHEMA = {
     "relevance": "medium",
@@ -95,6 +96,8 @@ _SAP_HINTS = [
 ]
 
 _MOJIBAKE_MARKERS = ("Ã", "â", "Â")
+
+
 
 
 def _fix_mojibake(value: str) -> str:
@@ -374,13 +377,17 @@ def _cohere_chat_raw(prompt: str, config: LLMConfig, logger=None) -> str:
 
     last_err: Exception | None = None
     for url in urls:
+        had_429 = False
         payload = payload_v2 if "/v2/" in url else payload_v1
         for attempt in range(4):
             try:
+                rate_limit_wait("cohere", config.max_requests_per_minute)
                 resp = requests.post(url, headers=headers, json=payload, timeout=timeout_s)
                 if resp.status_code == 404 and url != urls[-1]:
                     break
                 if resp.status_code in {429, 500, 502, 503, 504}:
+                    if resp.status_code == 429:
+                        had_429 = True
                     retry_after = resp.headers.get("Retry-After")
                     sleep_s = int(retry_after) if retry_after and retry_after.isdigit() else 1 + attempt
                     if logger:
@@ -430,6 +437,8 @@ def _cohere_chat_raw(prompt: str, config: LLMConfig, logger=None) -> str:
                         exc,
                     )
                 time.sleep(1 + attempt)
+        if had_429:
+            break
 
     raise RuntimeError(f"Cohere request failed after retries: {last_err}")
 

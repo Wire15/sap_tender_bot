@@ -1,4 +1,5 @@
 import html
+import re
 import smtplib
 from datetime import datetime, timezone
 from email import encoders
@@ -144,6 +145,8 @@ def _attachment_note_lines(t):
     for summary in t.get("attachment_summaries") or []:
         if not isinstance(summary, dict):
             continue
+        if summary.get("low_signal"):
+            continue
         name = summary.get("attachment_name") or "Attachment"
         payload = summary.get("summary") or {}
         reqs = payload.get("requirements") or []
@@ -222,7 +225,11 @@ def _llm_bullets(t):
     # Staffing requirements are intentionally omitted from the digest.
     if t.get("attachment_summary_used") and not attachment_reqs:
         for summary in t.get("attachment_summaries") or []:
-            memo = summary.get("memo") if isinstance(summary, dict) else ""
+            if not isinstance(summary, dict):
+                continue
+            if summary.get("low_signal"):
+                continue
+            memo = summary.get("memo") or ""
             if memo:
                 bullets.append(memo)
                 break
@@ -255,6 +262,7 @@ def _attachment_signal(t) -> str:
 
     dates_found = False
     risks_found = False
+    structured_found = False
     for summary in summaries:
         if not isinstance(summary, dict):
             continue
@@ -263,11 +271,23 @@ def _attachment_signal(t) -> str:
             dates_found = True
         if payload.get("key_risks"):
             risks_found = True
+        structured = summary.get("structured_summary")
+        if not structured and isinstance(payload, dict):
+            structured = payload.get("structured_summary")
+        if isinstance(structured, dict):
+            for items in structured.values():
+                if isinstance(items, list) and items:
+                    structured_found = True
+                    break
+        if structured_found:
+            break
 
     attachment_count = len(attachment_names) if attachment_names else len(summaries)
     req_count = len(requirements)
     dates_flag = "yes" if dates_found else "no"
     risks_flag = "yes" if risks_found else "no"
+    if req_count == 0 and not dates_found and not risks_found and not structured_found:
+        return ""
     return (
         "Attachment signal: "
         f"{attachment_count} attachments, reqs={req_count}, dates={dates_flag}, risks={risks_flag}"
@@ -281,10 +301,60 @@ def _rationale_bullets(t):
     return []
 
 
+def _fix_mojibake(text: str) -> str:
+    if not text:
+        return ""
+    suspect = (
+        "\u00e2\u20ac\u2122",
+        "\u00e2\u20ac\u201c",
+        "\u00e2\u20ac",
+        "\u00c3",
+        "\u00c2",
+        "\u00a4",
+    )
+    if any(token in text for token in suspect):
+        try:
+            repaired = text.encode("latin-1", errors="ignore").decode("utf-8", errors="ignore")
+            if repaired:
+                text = repaired
+        except Exception:
+            pass
+    replacements = {
+        "\u00e2\u20ac\u2122": "\u2019",
+        "\u00e2\u20ac\u201c": "\u201c",
+        "\u00e2\u20ac\u009d": "\u201d",
+        "\u00e2\u20ac\u0098": "\u2018",
+        "\u00e2\u20ac\u0099": "\u2019",
+        "\u00e2\u20ac\u2013": "\u2013",
+        "\u00e2\u20ac\u2014": "\u2014",
+        "\u00c2 ": " ",
+        "\u00c2": "",
+    }
+    for bad, good in replacements.items():
+        if bad in text:
+            text = text.replace(bad, good)
+    return text
+
+
 def _esc(value) -> str:
     if value is None:
         return ""
-    return html.escape(str(value), quote=True)
+    cleaned = _fix_mojibake(str(value))
+    return html.escape(cleaned, quote=True)
+
+
+def _sanitize_url(value) -> str:
+    if not value:
+        return ""
+    if isinstance(value, (list, tuple)):
+        value = " ".join(str(v) for v in value if v)
+    text = str(value)
+    if "," in text:
+        text = text.split(",", 1)[0].strip()
+    match = re.search(r"https?://\\S+", text)
+    if match:
+        return match.group(0).rstrip(").,;")
+    return text.split()[0] if text.split() else ""
 
 
 def _event_labels(events) -> str:
@@ -302,7 +372,7 @@ def _render_flagged_rows(items, *, include_events: bool = False) -> str:
         title = _esc(t.get("title", "Untitled"))
         org = _esc(t.get("org", "Unknown org"))
         close_date = _esc(t.get("close_date", "n/a"))
-        url = _esc(t.get("url", ""))
+        url = _esc(_sanitize_url(t.get("url", "")))
         source = _esc(t.get("source", "source"))
         bullets = _rationale_bullets(t) + _llm_bullets(t)
         bullet_html = "".join(f"<li>{_esc(b)}</li>" for b in bullets) if bullets else ""
@@ -343,7 +413,7 @@ def _render_watchlist_rows(items) -> str:
         title = _esc(t.get("title", "Untitled"))
         org = _esc(t.get("org", "Unknown org"))
         close_date = _esc(t.get("close_date", "n/a"))
-        url = _esc(t.get("url", ""))
+        url = _esc(_sanitize_url(t.get("url", "")))
         reason = _esc(t.get("_reject_reason", ""))
         source = _esc(t.get("source", "source"))
         events = _esc(_event_labels(t.get("_events") or t.get("events")))
@@ -379,7 +449,7 @@ def _render_upcoming_rows(items) -> str:
         org = _esc(t.get("org", "Unknown org"))
         close_date_raw = t.get("close_date")
         close_date = _esc(close_date_raw or "n/a")
-        url = _esc(t.get("url", ""))
+        url = _esc(_sanitize_url(t.get("url", "")))
         source = _esc(t.get("source", "source"))
         days_left = ""
         if close_date_raw:
@@ -512,7 +582,7 @@ def render_digest_html(
         for note in attachment_notes[:15]:
             title = _esc(note.get("title", "Untitled"))
             org = _esc(note.get("org", "Unknown org"))
-            url = _esc(note.get("url", ""))
+            url = _esc(_sanitize_url(note.get("url", "")))
             memo = _esc(note.get("memo", ""))
             if not memo:
                 continue
@@ -550,7 +620,7 @@ def render_digest_html(
         for item in attachment_structured[:30]:
             title = _esc(item.get("title", "Untitled"))
             org = _esc(item.get("org", "Unknown org"))
-            url = _esc(item.get("url", ""))
+            url = _esc(_sanitize_url(item.get("url", "")))
             attachment_name = _esc(item.get("attachment_name", "Attachment"))
             category = _esc(item.get("category", ""))
             text = _esc(item.get("text", ""))

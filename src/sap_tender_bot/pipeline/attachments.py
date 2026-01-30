@@ -25,6 +25,7 @@ import requests
 
 from sap_tender_bot.config import AttachmentsConfig, EmbeddingsConfig
 from sap_tender_bot.pipeline.semantic import _cosine_similarity, embed_texts
+from sap_tender_bot.utils.rate_limit import rate_limit_wait
 from sap_tender_bot.store import TenderStore
 
 SUPPORTED_MIME = {
@@ -254,6 +255,7 @@ _FRENCH_STOPWORDS = {
 _FRENCH_ACCENTS_RE = re.compile(r"[àâçéèêëîïôûùüÿœ]")
 
 
+
 @dataclass
 class AttachmentResult:
     url: str
@@ -352,6 +354,12 @@ def _has_evidence_span(item: str, evidence_norm: str) -> bool:
         return False
     if item_norm in evidence_norm:
         return True
+    # If the item carries a date and the evidence includes the same date, allow it.
+    item_dates = _DATE_HINT_RE.findall(item)
+    if item_dates:
+        for date in item_dates:
+            if _normalize_match_text(date) in evidence_norm:
+                return True
     tokens = [t for t in item_norm.split() if len(t) >= 4]
     if not tokens:
         return False
@@ -387,9 +395,27 @@ def _is_low_signal_requirement(text: str) -> bool:
         return True
     stripped = text.strip()
     if len(stripped) < 8:
+        lower = stripped.lower()
+        if re.search(r"\b(soc\s?1|soc\s?2|soc\s?3|iso\s?27001)\b", lower):
+            return False
+        if lower in {"ssl", "tls", "vpn", "ssh", "ipsec", "https", "aes", "rsa", "mfa"}:
+            return False
+        if "/" in stripped and len(stripped) <= 12:
+            return False
+        if re.fullmatch(r"[A-Z0-9/\\-]{2,10}", stripped):
+            return False
         return True
     words = re.findall(r"[A-Za-z0-9]+", stripped)
     if len(words) <= 2 and len(stripped) < 18:
+        lower = stripped.lower()
+        if re.search(r"\b(soc\s?1|soc\s?2|soc\s?3|iso\s?27001)\b", lower):
+            return False
+        if lower in {"ssl", "tls", "vpn", "ssh", "ipsec", "https", "aes", "rsa", "mfa"}:
+            return False
+        if "/" in stripped and len(stripped) <= 12:
+            return False
+        if re.fullmatch(r"[A-Z0-9/\\-]{2,10}", stripped):
+            return False
         return True
     if len(words) <= 4:
         upper_ratio = sum(1 for w in words if w.isupper()) / max(len(words), 1)
@@ -530,7 +556,7 @@ def _detect_language(text: str) -> Optional[str]:
     return "en"
 
 
-def _build_prompt(attachment_name: str, excerpt: str, *, language: str = "en") -> str:
+def _build_prompt_v1(attachment_name: str, excerpt: str, *, language: str = "en") -> str:
     language_note = ""
     if language == "fr":
         language_note = (
@@ -552,6 +578,47 @@ def _build_prompt(attachment_name: str, excerpt: str, *, language: str = "en") -
         f"ATTACHMENT: {attachment_name}\n"
         f"EXCERPT:\n{excerpt}\n"
     )
+
+
+def _build_prompt_v2(attachment_name: str, excerpt: str, *, language: str = "en") -> str:
+    language_note = ""
+    if language == "fr":
+        language_note = (
+            "The attachment is in French. Keep extracted phrases in French.\n"
+        )
+    return (
+        "You are extracting procurement requirements from a tender attachment. "
+        "Return ONLY valid JSON with these exact keys:\n"
+        "- requirements: array of short strings (prefer exact phrases from the text)\n"
+        "- key_risks: array of short strings (risks or constraints stated in the text)\n"
+        "- dates: array of short strings (deadlines, milestones, site visits with dates/times)\n"
+        "- attachments_used: array of strings (attachment names if present)\n"
+        "Rules:\n"
+        "- Do NOT invent facts, dates, vendors, or evaluation criteria.\n"
+        "- Only include items that are explicitly supported by the excerpt.\n"
+        "- Use exact wording when possible; do not add verbs like 'Provide' or 'Submit' unless those words appear.\n"
+        "- For spreadsheets, copy cell text verbatim; do not infer missing verbs or subjects.\n"
+        "- Prefer requirements with concrete specifics (formats, quantities, portals, deadlines, must/shall).\n"
+        "- Avoid boilerplate like 'table of contents', 'introduction', 'background'.\n"
+        "- If nothing is found, return empty arrays but include all keys.\n"
+        "No markdown, no extra text.\n\n"
+        f"{language_note}"
+        f"ATTACHMENT: {attachment_name}\n"
+        f"EXCERPT:\n{excerpt}\n"
+    )
+
+
+def _build_prompt(
+    attachment_name: str,
+    excerpt: str,
+    *,
+    language: str = "en",
+    prompt_version: str = "v1",
+) -> str:
+    version = (prompt_version or "v1").strip().lower()
+    if version == "v2":
+        return _build_prompt_v2(attachment_name, excerpt, language=language)
+    return _build_prompt_v1(attachment_name, excerpt, language=language)
 
 
 def _build_repair_prompt(bad_json: str) -> str:
@@ -671,13 +738,19 @@ def _cohere_chat_raw(
 
     last_err: Exception | None = None
     for url in urls:
+        had_429 = False
         payload = payload_v2 if "/v2/" in url else payload_v1
         for attempt in range(4):
             try:
+                rate_limit_wait(
+                    "cohere", getattr(config, "llm_max_requests_per_minute", 0) or 0
+                )
                 resp = requests.post(url, headers=headers, json=payload, timeout=timeout_s)
                 if resp.status_code == 404 and url != urls[-1]:
                     break
                 if resp.status_code in {429, 500, 502, 503, 504}:
+                    if resp.status_code == 429:
+                        had_429 = True
                     retry_after = resp.headers.get("Retry-After")
                     base_sleep = int(retry_after) if retry_after and retry_after.isdigit() else 1 + attempt
                     sleep_s = base_sleep + random.uniform(0, 0.5)
@@ -749,6 +822,8 @@ def _cohere_chat_raw(
                         exc,
                     )
                 time.sleep(1 + attempt)
+        if had_429:
+            break
 
     raise RuntimeError(f"Cohere request failed after retries: {last_err}")
 
@@ -994,6 +1069,7 @@ def _normalize_summary(summary: dict, *, evidence_text: str = "") -> dict:
     evidence_norm = _normalize_match_text(evidence_text)
     requirements = []
     for r in _coerce_list(summary.get("requirements"), max_items=8):
+        r = _fix_mojibake(r)
         if _is_boilerplate_requirement(r):
             continue
         if evidence_norm and not _has_evidence_span(r, evidence_norm):
@@ -1003,6 +1079,7 @@ def _normalize_summary(summary: dict, *, evidence_text: str = "") -> dict:
 
     dates = []
     for d in _coerce_list(summary.get("dates"), max_items=6):
+        d = _fix_mojibake(d)
         if _is_low_signal_date(d):
             continue
         if evidence_norm and not _has_evidence_span(d, evidence_norm):
@@ -1012,13 +1089,14 @@ def _normalize_summary(summary: dict, *, evidence_text: str = "") -> dict:
 
     risks = []
     for r in _coerce_list(summary.get("key_risks"), max_items=6):
+        r = _fix_mojibake(r)
         if _is_low_signal_risk(r):
             continue
         risks.append(r)
     risks = _dedupe_items(risks)
 
     attachments_used = _dedupe_items(
-        _coerce_list(summary.get("attachments_used"), max_items=4)
+        [_fix_mojibake(a) for a in _coerce_list(summary.get("attachments_used"), max_items=4)]
     )
 
     normalized = {
@@ -1106,14 +1184,14 @@ def _normalize_structured_items(
         raw_items = [items]
     for item in raw_items:
         if isinstance(item, dict):
-            text = str(item.get("text") or "").strip()
+            text = _fix_mojibake(str(item.get("text") or "").strip())
             citations = _normalize_citations(
                 item.get("citations"),
                 attachment_id=attachment_id,
                 default_heading=str(item.get("section_heading") or ""),
             )
         else:
-            text = str(item).strip()
+            text = _fix_mojibake(str(item).strip())
             citations = _normalize_citations(
                 [],
                 attachment_id=attachment_id,
@@ -1327,6 +1405,7 @@ def _extract_spreadsheet_text(
         sheet_names = sheet_names[:max_sheets]
 
     text_parts: list[str] = []
+    sheet_hints: list[str] = []
     processed = 0
     for name in sheet_names:
         df = sheets.get(name)
@@ -1337,18 +1416,41 @@ def _extract_spreadsheet_text(
         if max_cols > 0 and getattr(df, "shape", (0, 0))[1] > max_cols:
             df = df.iloc[:, :max_cols]
         df = df.fillna("")
+        try:
+            rows = int(getattr(df, "shape", (0, 0))[0])
+            cols = int(getattr(df, "shape", (0, 0))[1])
+        except Exception:
+            rows = 0
+            cols = 0
+        headers: list[str] = []
+        try:
+            headers = [
+                str(c).strip()
+                for c in df.columns.tolist()
+                if str(c).strip() and "unnamed" not in str(c).strip().lower()
+            ]
+        except Exception:
+            headers = []
         sheet_text = _dataframe_to_csv_text(df)
         if sheet_char_budget > 0 and len(sheet_text) > sheet_char_budget:
             sheet_text = sheet_text[:sheet_char_budget].rsplit("\n", 1)[0].strip()
         if sheet_text:
             text_parts.append(f"SHEET: {name}\n{sheet_text}".strip())
             processed += 1
+        header_preview = ", ".join(headers[:4]) if headers else ""
+        if header_preview:
+            sheet_hints.append(
+                f"Sheet {name} (rows {rows}, cols {cols}; headers: {header_preview})"
+            )
+        else:
+            sheet_hints.append(f"Sheet {name} (rows {rows}, cols {cols})")
 
     meta = {
         "sheet_count": len(sheets),
         "sheet_processed": processed,
         "spreadsheet_rows": max_rows,
         "spreadsheet_cols": max_cols,
+        "sheet_hints": sheet_hints[: max_sheets or len(sheet_hints)],
     }
     return "\n\n".join(text_parts).strip(), meta
 
@@ -1447,6 +1549,41 @@ def _strip_repeated_lines(pages: list[str]) -> list[str]:
     return cleaned_pages
 
 
+def _fix_mojibake(text: str) -> str:
+    if not text:
+        return ""
+    suspect = (
+        "\u00e2\u20ac\u2122",
+        "\u00e2\u20ac\u201c",
+        "\u00e2\u20ac",
+        "\u00c3",
+        "\u00c2",
+        "\u00a4",
+    )
+    if any(token in text for token in suspect):
+        try:
+            repaired = text.encode("latin-1", errors="ignore").decode("utf-8", errors="ignore")
+            if repaired:
+                text = repaired
+        except Exception:
+            pass
+    replacements = {
+        "\u00e2\u20ac\u2122": "\u2019",
+        "\u00e2\u20ac\u201c": "\u201c",
+        "\u00e2\u20ac\u009d": "\u201d",
+        "\u00e2\u20ac\u0098": "\u2018",
+        "\u00e2\u20ac\u0099": "\u2019",
+        "\u00e2\u20ac\u2013": "\u2013",
+        "\u00e2\u20ac\u2014": "\u2014",
+        "\u00c2 ": " ",
+        "\u00c2": "",
+    }
+    for bad, good in replacements.items():
+        if bad in text:
+            text = text.replace(bad, good)
+    return text
+
+
 def _normalize_extracted_text(text: str) -> str:
     if not text:
         return ""
@@ -1456,7 +1593,7 @@ def _normalize_extracted_text(text: str) -> str:
         if not line:
             continue
         lines.append(line)
-    if len(lines) >= 30:
+    if len(lines) >= 20:
         counts: Counter[str] = Counter(lines)
         repeated = {
             line
@@ -1466,7 +1603,8 @@ def _normalize_extracted_text(text: str) -> str:
         if repeated:
             lines = [line for line in lines if line not in repeated]
     cleaned = "\n".join(lines)
-    return re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+    return _fix_mojibake(cleaned).strip()
 
 
 def _strip_accents(text: str) -> str:
@@ -1726,6 +1864,18 @@ def _truncate_sentence(text: str, max_len: int) -> str:
     return truncated or text[:max_len].strip()
 
 
+def _summary_has_signal(summary: dict, structured_summary: Optional[dict]) -> bool:
+    if not isinstance(summary, dict):
+        summary = {}
+    if summary.get("requirements") or summary.get("dates") or summary.get("key_risks"):
+        return True
+    if isinstance(structured_summary, dict):
+        for items in structured_summary.values():
+            if isinstance(items, list) and items:
+                return True
+    return False
+
+
 def _build_attachment_memo(
     summary: dict,
     *,
@@ -1749,7 +1899,9 @@ def _build_attachment_memo(
             if len(cleaned) >= 2:
                 break
         if cleaned:
-            parts.append(f"Sections: {', '.join(cleaned)}.")
+            lower = " ".join(cleaned).lower()
+            label = "Sheets" if "sheet " in lower or "sheet:" in lower else "Sections"
+            parts.append(f"{label}: {', '.join(cleaned)}.")
     if reqs:
         parts.append(f"Requirements: {', '.join(str(r) for r in reqs[:2])}.")
     if dates:
@@ -2034,6 +2186,7 @@ def _process_attachment_job(
         structured_summary = None
         llm_gated = False
         language = str(getattr(config, "language_default", "en") or "en")
+        extract_meta: dict = {}
         if existing and existing.get("summary_json"):
             try:
                 summary = json.loads(existing["summary_json"])
@@ -2205,7 +2358,10 @@ def _process_attachment_job(
                 if allowed:
                     try:
                         prompt = _build_prompt(
-                            _attachment_name(url), excerpt, language=language
+                            _attachment_name(url),
+                            excerpt,
+                            language=language,
+                            prompt_version=str(getattr(config, "prompt_version", "v1")),
                         )
                         if logger:
                             logger.info("Attachment LLM: requesting summary for %s", url)
@@ -2317,7 +2473,11 @@ def _process_attachment_job(
                 meta["structured_summary_json"] = json.dumps(
                     structured_summary, ensure_ascii=False
                 )
-            source_sections = [s.get("heading") for s in sections]
+            source_sections = [s.get("heading") for s in sections if s.get("heading")]
+            if not source_sections:
+                sheet_hints = extract_meta.get("sheet_hints") or []
+                if isinstance(sheet_hints, list):
+                    source_sections = [str(h).strip() for h in sheet_hints if str(h).strip()]
             if source_sections:
                 meta["source_sections_json"] = json.dumps(source_sections, ensure_ascii=False)
             if selected_chunks:
@@ -2346,12 +2506,24 @@ def _process_attachment_job(
             summary = _scrub_summary_pii(summary)
             if structured_summary:
                 structured_summary = _scrub_structured_summary(structured_summary)
-        source_sections = [s.get("heading") for s in sections]
+        source_sections = [s.get("heading") for s in sections if s.get("heading")]
+        if not source_sections and existing and existing.get("source_sections_json"):
+            try:
+                cached_sections = json.loads(existing.get("source_sections_json") or "[]")
+                if isinstance(cached_sections, list):
+                    source_sections = [str(h).strip() for h in cached_sections if str(h).strip()]
+            except Exception:
+                source_sections = []
+        if not source_sections:
+            sheet_hints = extract_meta.get("sheet_hints") or []
+            if isinstance(sheet_hints, list):
+                source_sections = [str(h).strip() for h in sheet_hints if str(h).strip()]
         memo = _build_attachment_memo(
             summary,
             attachment_name=_attachment_name(url),
             source_sections=source_sections,
         )
+        low_signal = not _summary_has_signal(summary, structured_summary)
         if summary.get("_llm_failed"):
             memo = _excerpt_fallback_memo(
                 excerpt_text, attachment_name=_attachment_name(url)
@@ -2363,6 +2535,7 @@ def _process_attachment_job(
             "summary": summary,
             "structured_summary": structured_summary,
             "memo": memo,
+            "low_signal": low_signal,
             "source_sections": source_sections,
             "selected_chunks": [
                 {

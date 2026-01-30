@@ -198,6 +198,7 @@ class LLMConfig:
     model: str = "command-a-03-2025"
     api_base: str = "https://api.cohere.com"
     timeout_s: int = 45
+    max_requests_per_minute: int = 20
     borderline_max: int = 10
     daily_cap: int = 120
     per_run_max: int = 40
@@ -210,6 +211,7 @@ class LLMConfig:
             "model": self.model,
             "api_base": self.api_base,
             "timeout_s": self.timeout_s,
+            "max_requests_per_minute": self.max_requests_per_minute,
             "borderline_max": self.borderline_max,
             "daily_cap": self.daily_cap,
             "per_run_max": self.per_run_max,
@@ -283,6 +285,8 @@ class AttachmentsConfig:
     llm_per_run_max: int = 20
     llm_concurrency: int = 2
     llm_daily_cap: int = 0
+    prompt_version: str = "v2"
+    llm_max_requests_per_minute: int = 20
 
     def to_dict(self) -> dict:
         return {
@@ -328,6 +332,8 @@ class AttachmentsConfig:
             "llm_per_run_max": self.llm_per_run_max,
             "llm_concurrency": self.llm_concurrency,
             "llm_daily_cap": self.llm_daily_cap,
+            "prompt_version": self.prompt_version,
+            "llm_max_requests_per_minute": self.llm_max_requests_per_minute,
         }
 
 
@@ -515,6 +521,7 @@ def config_from_dict(repo_root: Path, data: dict) -> AppConfig:
             llm_per_run_max=int(attachments_data.get("llm_per_run_max", 20)),
             llm_concurrency=int(attachments_data.get("llm_concurrency", 2)),
             llm_daily_cap=int(attachments_data.get("llm_daily_cap", 0)),
+            prompt_version=str(attachments_data.get("prompt_version", "v2")),
         ),
         sources=list(sources_data) if isinstance(sources_data, list) else list(DEFAULT_SOURCES),
     )
@@ -643,6 +650,10 @@ def apply_env_overrides(config: AppConfig) -> AppConfig:
     config.llm.timeout_s = _int_from_env(
         os.getenv("COHERE_TIMEOUT"),
         config.llm.timeout_s,
+    )
+    config.llm.max_requests_per_minute = _int_from_env(
+        os.getenv("SAP_TENDER_LLM_MAX_RPM"),
+        config.llm.max_requests_per_minute,
     )
     config.llm.enabled = _bool_from_env(
         os.getenv("SAP_TENDER_LLM_ENABLED"),
@@ -855,6 +866,14 @@ def apply_env_overrides(config: AppConfig) -> AppConfig:
     config.attachments.llm_daily_cap = _int_from_env(
         os.getenv("SAP_TENDER_ATTACHMENTS_LLM_DAILY_CAP"),
         config.attachments.llm_daily_cap,
+    )
+    config.attachments.llm_max_requests_per_minute = _int_from_env(
+        os.getenv("SAP_TENDER_ATTACHMENTS_LLM_MAX_RPM"),
+        config.attachments.llm_max_requests_per_minute,
+    )
+    config.attachments.prompt_version = os.getenv(
+        "SAP_TENDER_ATTACHMENTS_PROMPT_VERSION",
+        config.attachments.prompt_version,
     )
 
     if config.attachments.llm_kill_switch:

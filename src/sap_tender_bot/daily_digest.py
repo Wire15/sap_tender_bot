@@ -220,6 +220,7 @@ def _attachment_signal(t: dict) -> str:
 
     dates_found = False
     risks_found = False
+    structured_found = False
     for summary in summaries:
         if not isinstance(summary, dict):
             continue
@@ -228,11 +229,23 @@ def _attachment_signal(t: dict) -> str:
             dates_found = True
         if payload.get("key_risks"):
             risks_found = True
+        structured = summary.get("structured_summary")
+        if not structured and isinstance(payload, dict):
+            structured = payload.get("structured_summary")
+        if isinstance(structured, dict):
+            for items in structured.values():
+                if isinstance(items, list) and items:
+                    structured_found = True
+                    break
+        if structured_found:
+            break
 
     attachment_count = len(attachment_names) if attachment_names else len(summaries)
     req_count = len(requirements)
     dates_flag = "yes" if dates_found else "no"
     risks_flag = "yes" if risks_found else "no"
+    if req_count == 0 and not dates_found and not risks_found and not structured_found:
+        return ""
     return (
         "Attachment signal: "
         f"{attachment_count} attachments, reqs={req_count}, dates={dates_flag}, risks={risks_flag}"
@@ -424,6 +437,41 @@ def _truncate_note(text: str, max_len: int = 320) -> str:
     return trimmed or text[:max_len].strip()
 
 
+def _fix_mojibake(text: str) -> str:
+    if not text:
+        return ""
+    suspect = (
+        "\u00e2\u20ac\u2122",
+        "\u00e2\u20ac\u201c",
+        "\u00e2\u20ac",
+        "\u00c3",
+        "\u00c2",
+        "\u00a4",
+    )
+    if any(token in text for token in suspect):
+        try:
+            repaired = text.encode("latin-1", errors="ignore").decode("utf-8", errors="ignore")
+            if repaired:
+                text = repaired
+        except Exception:
+            pass
+    replacements = {
+        "\u00e2\u20ac\u2122": "\u2019",
+        "\u00e2\u20ac\u201c": "\u201c",
+        "\u00e2\u20ac\u009d": "\u201d",
+        "\u00e2\u20ac\u0098": "\u2018",
+        "\u00e2\u20ac\u0099": "\u2019",
+        "\u00e2\u20ac\u2013": "\u2013",
+        "\u00e2\u20ac\u2014": "\u2014",
+        "\u00c2 ": " ",
+        "\u00c2": "",
+    }
+    for bad, good in replacements.items():
+        if bad in text:
+            text = text.replace(bad, good)
+    return text
+
+
 def _has_sap_signal(t: dict) -> bool:
     terms = (
         "sap",
@@ -464,25 +512,35 @@ def _build_attachment_note(t: dict) -> str:
     for summary in t.get("attachment_summaries") or []:
         if not isinstance(summary, dict):
             continue
+        if summary.get("low_signal"):
+            continue
         name = summary.get("attachment_name") or "Attachment"
         payload = summary.get("summary") or {}
         reqs = payload.get("requirements") or []
         dates = payload.get("dates") or []
         parts: list[str] = []
         if reqs:
-            parts.append(f"Reqs: {', '.join(str(r) for r in reqs[:2])}")
+            parts.append(
+                f"Reqs: {', '.join(_fix_mojibake(str(r)) for r in reqs[:2])}"
+            )
         if dates:
-            parts.append(f"Dates: {', '.join(str(d) for d in dates[:2])}")
+            parts.append(
+                f"Dates: {', '.join(_fix_mojibake(str(d)) for d in dates[:2])}"
+            )
         if parts:
-            lines.append(f"{name}: " + " | ".join(parts))
+            lines.append(f"{_fix_mojibake(str(name))}: " + " | ".join(parts))
         if len(lines) >= 2:
             break
     if not lines:
         for summary in t.get("attachment_summaries") or []:
-            if isinstance(summary, dict) and summary.get("memo"):
-                lines.append(str(summary.get("memo")))
+            if not isinstance(summary, dict):
+                continue
+            if summary.get("low_signal"):
+                continue
+            if summary.get("memo"):
+                lines.append(_fix_mojibake(str(summary.get("memo"))))
                 break
-    if _has_sap_signal(t):
+    if lines and _has_sap_signal(t):
         lines.append("Why it matters: SAP/ERP signal found.")
     note = " ".join(line.strip() for line in lines if line).strip()
     return _truncate_note(note, max_len=320)

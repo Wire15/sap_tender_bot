@@ -127,7 +127,9 @@ def test_docx_table_caps(tmp_path: Path) -> None:
 
 
 def test_spreadsheet_extraction_xlsx(tmp_path: Path) -> None:
+    import pytest
     import pandas as pd
+    pytest.importorskip("openpyxl")
     from sap_tender_bot.config import AttachmentsConfig
 
     xlsx_path = tmp_path / "sample.xlsx"
@@ -155,7 +157,13 @@ def test_spreadsheet_extraction_xlsx(tmp_path: Path) -> None:
 
 
 def test_spreadsheet_extraction_xls(tmp_path: Path) -> None:
+    import pytest
     import pandas as pd
+    pytest.importorskip("xlwt")
+    try:
+        pd.DataFrame({"_probe": [1]}).to_excel(tmp_path / "_probe.xls", index=False, engine="xlwt")
+    except ValueError:
+        pytest.skip("pandas xlwt writer not available")
     from sap_tender_bot.config import AttachmentsConfig
 
     xls_path = tmp_path / "sample.xls"
@@ -183,7 +191,9 @@ def test_spreadsheet_extraction_xls(tmp_path: Path) -> None:
 
 
 def test_spreadsheet_large_truncation(tmp_path: Path) -> None:
+    import pytest
     import pandas as pd
+    pytest.importorskip("openpyxl")
     from sap_tender_bot.config import AttachmentsConfig
 
     xlsx_path = tmp_path / "large.xlsx"
@@ -253,7 +263,9 @@ def test_fixture_attachment_extraction_docx(tmp_path: Path) -> None:
 
 
 def test_fixture_attachment_extraction_xlsx(tmp_path: Path) -> None:
+    import pytest
     import pandas as pd
+    pytest.importorskip("openpyxl")
     from sap_tender_bot.config import AttachmentsConfig
 
     xlsx_path = tmp_path / "fixture.xlsx"
